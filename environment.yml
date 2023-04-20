@@ -18,3 +18,4 @@ dependencies:
   - dgl
   - pip:
     - torchviz
+    - einops
