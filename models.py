@@ -413,8 +413,9 @@ class IJEPA_base(nn.Module):
         if self.mode == 'test':
             encoding = self.student_encoder(x, B, T, W) # input in format 'b (t h w) m',output in format 'b t (h w) m' (batch frames n_patches embed_dim)
             encoding = self.norm(encoding)
-            #add 11 mask tokens to the end of the embedding
             n = encoding.shape[2]
+            encoding = rearrange(encoding, 'b t (h w) m -> b (t h w) m',b=B,t=T,w=W)
+            #add 11 mask tokens to the end of the embedding
             target_masks = self.mask_token.repeat(B, 11, n, 1)
             target_pos_embedding = self.pos_embed.unsqueeze(1)
             target_masks = target_masks + target_pos_embedding
@@ -423,7 +424,7 @@ class IJEPA_base(nn.Module):
             target_time_embed = self.time_embed.unsqueeze(2)[:,11:]
             target_masks = target_masks + target_time_embed
             
-            target_masks = rearrange(target_masks, 'b t (h w) m -> b (t h w) m',b=B,t=self.M,w=W)
+            target_masks = rearrange(target_masks, 'b t (h w) m -> b (t h w) m',b=B,t=11,w=W)
             encoding = torch.cat((encoding, target_masks), dim=1)
             return self.predictor(encoding, B, T+11, W) # predict the masked frames
         
@@ -450,6 +451,8 @@ class IJEPA_base(nn.Module):
         
         target_masks = rearrange(target_masks, 'b t (h w) m -> b (t h w) m',b=B,t=self.M,w=W)
         prediction_cat = torch.cat((context_encoding, target_masks), dim = 1)
+        # make sure that the preds are actually at the end
         prediction_blocks = self.predictor(prediction_cat,B, T, W)
 
+        prediction_blocks = prediction_blocks[:,-4:]
         return prediction_blocks, target_blocks
