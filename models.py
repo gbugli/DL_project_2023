@@ -437,6 +437,8 @@ class IJEPA_base(nn.Module):
         target_masks = self.mask_token.repeat(B, 11, n, 1)
         target_pos_embedding = self.pos_embed
         target_masks = target_masks + target_pos_embedding.unsqueeze(1)
+        # Add temp_embedding
+        
         target_masks = rearrange(target_masks, 'b t (h w) m -> b (t h w) m',b=B,t=11,w=W)
         prediction_cat = torch.cat((context_encoding, target_masks), dim = 1)
         prediction_blocks = self.predictor(prediction_cat,B, T, W)
