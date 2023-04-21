@@ -315,7 +315,7 @@ class VisionTransformer(nn.Module):
 class IJEPA_base(nn.Module):
     def __init__(self, img_size=224, patch_size=16, in_chans=3, embed_dim=768, enc_depth=12, pred_depth=12, num_heads=12,
                   mlp_ratio=4., qkv_bias=False, qk_scale=None, drop_rate=0., attn_drop_rate=0.,
-                 drop_path_rate=0.1, hybrid_backbone=None, norm_layer=nn.LayerNorm, num_frames=8, attention_type='divided_space_time', dropout=0.,
+                 drop_path_rate=0.1, hybrid_backbone=None, norm_layer=nn.LayerNorm, num_frames=22, attention_type='divided_space_time', dropout=0.,
                  mode="train", M=4):
         super().__init__()
         self.mode = mode
@@ -371,8 +371,8 @@ class IJEPA_base(nn.Module):
         
         #mask the selected frames in the context block
         target_block = x[:,mask_indices] #get 4 random frames from the last 11 frames
-        all_patches = x
-        return target_block, all_patches, mask_indices
+        #all_patches = x
+        return target_block, mask_indices
 
     ### get the context block
     def get_context_block(self, x, B, T, W, mask_indices):
@@ -388,9 +388,6 @@ class IJEPA_base(nn.Module):
     def get_patch_embeddings(self, x):
         B = x.shape[0]
         x, T, W = self.patch_embed(x)
-        print(x.shape)
-        print(self.pos_embed.shape)
-        print(self.patch_embed.num_patches)
         x = x + self.pos_embed
         x = self.pos_drop(x)
 
@@ -414,11 +411,25 @@ class IJEPA_base(nn.Module):
 
         #if mode is test, we get return full embedding:
         if self.mode == 'test':
-            return self.student_encoder(x, B, T, W) # input in format 'b (t h w) m',output in format 'b t (h w) m' (batch frames n_patches embed_dim)
+            encoding = self.student_encoder(x, B, T, W) # input in format 'b (t h w) m',output in format 'b t (h w) m' (batch frames n_patches embed_dim)
+            encoding = self.norm(encoding)
+            #add 11 mask tokens to the end of the embedding
+            n = encoding.shape[2]
+            target_masks = self.mask_token.repeat(B, 11, n, 1)
+            target_pos_embedding = self.pos_embed.unsqueeze(1)
+            target_masks = target_masks + target_pos_embedding
+            
+            # Add time embedding
+            target_time_embed = self.time_embed.unsqueeze(2)[:,11:]
+            target_masks = target_masks + target_time_embed
+            
+            target_masks = rearrange(target_masks, 'b t (h w) m -> b (t h w) m',b=B,t=self.M,w=W)
+            encoding = torch.cat((encoding, target_masks), dim=1)
+            return self.predictor(encoding, B, T+11, W) # predict the masked frames
         
         # #get target embeddings
         # input in format 'b (t h w) m', output in format (1) 'b 11 (h w) m' and (2) 'b t (h w) m'
-        target_blocks, all_blocks, mask_indices = self.get_target_block(self.teacher_encoder,x,B,T,W)
+        target_blocks, mask_indices = self.get_target_block(self.teacher_encoder,x,B,T,W)
 
         #get context embeddings
         context_block = self.get_context_block(x, B, T, W, mask_indices)
