@@ -278,8 +278,7 @@ class VisionTransformer(nn.Module):
             nn.init.constant_(m.bias, 0)
             nn.init.constant_(m.weight, 1.0)
 
-
-    def forward_features(self, x):
+    def forward(self, x, B, T, W):
 
         ## Attention blocks
         for blk in self.blocks:
@@ -291,12 +290,26 @@ class VisionTransformer(nn.Module):
             x = torch.mean(x, 1) # averaging predictions for every frame
 
         x = self.norm(x)
-
+        x = rearrange(x, 'b (h w t) m -> b t (h w) m',b=B,t=T,w=W)
         return x
+    # def forward_features(self, x):
 
-    def forward(self, x):
-        x = self.forward_features(x)
-        return x
+    #     ## Attention blocks
+    #     for blk in self.blocks:
+    #         x = blk(x, B, T, W)
+
+    #     ### Predictions for space-only baseline
+    #     if self.attention_type == 'space_only':
+    #         x = rearrange(x, '(b t) n m -> b t n m',b=B,t=T)
+    #         x = torch.mean(x, 1) # averaging predictions for every frame
+
+    #     x = self.norm(x)
+
+    #     return x
+
+    # def forward(self, x):
+    #     x = self.forward_features(x)
+    #     return x
 
 
 class IJEPA_base(nn.Module):
@@ -313,6 +326,7 @@ class IJEPA_base(nn.Module):
         ####
 
         self.norm_layer = norm_layer
+        self.norm = norm_layer(embed_dim)
 
         self.attention_type = attention_type
 
@@ -346,42 +360,15 @@ class IJEPA_base(nn.Module):
 
     ### NEED TO MODIFY get_target_block METHOD
     @torch.no_grad() 
-    def get_target_block(self, target_encoder, x, patch_dim, aspect_ratio, scale, M):  
+    def get_target_block(self, target_encoder, x, B, T, W):  
         #get the target block
         target_encoder = target_encoder.eval()
-        x = target_encoder(x)
+        x = target_encoder(x, B, T, W) # input in format 'b (t h w) m',output in format 'b t (h w) m' (batch frames n_patches embed_dim)
         x = self.norm(x)
         #get the patch dimensions
-        patch_h, patch_w = patch_dim
-        #get the number of patches
-        num_patches = patch_h * patch_w
-        #get the number of patches in the target block
-        num_patches_block = int(patch_h * patch_w * scale)
-        #get the height and width of the target block with aspect ratio
-        block_h = int(torch.sqrt(torch.tensor(num_patches_block / aspect_ratio)))
-        block_w = int(aspect_ratio * block_h)
-        #get the patches in the target block
-        target_block = torch.zeros((M, x.shape[0], block_h*block_w, x.shape[2]))
-        target_patches = []
-        all_patches = []
-        for z in range(M):
-            #get the starting patch
-            start_patch_h = torch.randint(0, patch_h - block_h+1, (1,)).item()
-            start_patch_w = torch.randint(0, patch_w - block_w+1, (1,)).item()
-            start_patch = start_patch_h * patch_w + start_patch_w
-
-            patches = []
-            #get the patches in the target block
-            for i in range(block_h):
-                for j in range(block_w):
-                    patches.append(start_patch + i * patch_w + j)
-                    if start_patch + i * patch_w + j not in all_patches:
-                        all_patches.append(start_patch + i * patch_w + j)
-                    
-            #get the target block
-            target_patches.append(patches)
-            target_block[z] = x[:, patches, :]
-        return target_block.cuda(), target_patches, all_patches
+        target_block = x[:,11:] #get last 11 frames as target
+        all_patches = x
+        return target_block, all_patches
 
 
     ### NEED TO MODIFY get_context_block METHOD
@@ -425,31 +412,34 @@ class IJEPA_base(nn.Module):
             x = self.time_drop(x)
             x = rearrange(x, '(b n) t m -> b (n t) m',b=B,t=T)
             
-        return x
+        return x, B, T, W
     
-    def forward(self, x, target_aspect_ratio=1, target_scale=1, context_aspect_ratio=1, context_scale=1):
+    def forward(self, x):
         #get the patch embeddings
-        x = self.get_patch_embeddings(x)
+        x, B, T, W = self.get_patch_embeddings(x)
 
         #if mode is test, we get return full embedding:
         if self.mode == 'test':
-            return self.student_encoder(x)
+            return self.student_encoder(x, B, T, W) # input in format 'b (t h w) m',output in format 'b t (h w) m' (batch frames n_patches embed_dim)
         # #get target embeddings
-        target_blocks, target_patches, all_patches = self.get_target_block(self.teacher_encoder, x, self.patch_dim, target_aspect_ratio, target_scale, self.M)
-        m, b, n, e = target_blocks.shape
+        # input in format 'b (t h w) m', output in format (1) 'b 11 (h w) m' and (2) 'b t (h w) m'
+        target_blocks, all_blocks = self.get_target_block(self.teacher_encoder,x,B,T,W) # change 11 with self.M?
+        n = target_blocks.shape[2]
+
         #get context embedding
+        context_block = rearrange(x, 'b (h w t) m -> b t (h w) m',b=B,t=T,w=W)[:,:11] #get the first 11 as context
+        context_block = rearrange(context_block, 'b t (h w) m -> b (t h w) m',b=B,t=11,w=W)
 
-        context_block = self.get_context_block(x, self.patch_dim, context_aspect_ratio, context_scale, all_patches)
-        context_encoding = self.student_encoder(context_block)
+        context_encoding = self.student_encoder(context_block, B, 11, W)
         context_encoding = self.norm(context_encoding)
+        context_encoding = rearrange(context_encoding, 'b t (h w) m -> b (t h w) m',b=B,t=11,w=W)
 
 
-        prediction_blocks = torch.zeros((m, b, n, e)).cpu()
-        #get the prediction blocks, predict each target block separately
-        for i in range(m):
-            target_masks = self.mask_token.repeat(b, n, 1)
-            target_pos_embedding = self.pos_embedding[:, target_patches[i], :]
-            target_masks = target_masks + target_pos_embedding
-            prediction_blocks[i] = self.predictor(context_encoding, target_masks)
+        target_masks = self.mask_token.repeat(B, 11, n, 1)
+        target_pos_embedding = self.pos_embed
+        target_masks = target_masks + target_pos_embedding.unsqueeze(1)
+        target_masks = rearrange(target_masks, 'b t (h w) m -> b (t h w) m',b=B,t=11,w=W)
+        prediction_cat = torch.cat((context_encoding, target_masks), dim = 1)
+        prediction_blocks = self.predictor(prediction_cat,B, T, W)
 
         return prediction_blocks, target_blocks
