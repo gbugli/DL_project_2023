@@ -358,7 +358,6 @@ class IJEPA_base(nn.Module):
         )
         
 
-    ### NEED TO MODIFY get_target_block METHOD
     @torch.no_grad() 
     def get_target_block(self, target_encoder, x, B, T, W):  
         #get the target block
@@ -372,24 +371,24 @@ class IJEPA_base(nn.Module):
 
 
     ### NEED TO MODIFY get_context_block METHOD
-    def get_context_block(self, x, patch_dim, aspect_ratio, scale, target_patches):
-        patch_h, patch_w = patch_dim
-        #get the number of patches in the target block
-        num_patches_block = int(patch_h * patch_w * scale)
-        #get the height and width of the target block with aspect ratio
-        block_h = int(torch.sqrt(torch.tensor(num_patches_block / aspect_ratio)))
-        block_w = int(aspect_ratio * block_h)
-        #get the starting patch
-        start_patch_h = torch.randint(0, patch_h - block_h+1, (1,)).item()
-        start_patch_w = torch.randint(0, patch_w - block_w+1, (1,)).item()
-        start_patch = start_patch_h * patch_w + start_patch_w
-        #get the patches in the context_block
-        patches = []
-        for i in range(block_h):
-            for j in range(block_w):
-                if start_patch + i * patch_w + j not in target_patches: #remove the target patches
-                    patches.append(start_patch + i * patch_w + j)
-        return x[:, patches, :]
+    # def get_context_block(self, x, patch_dim, aspect_ratio, scale, target_patches):
+    #     patch_h, patch_w = patch_dim
+    #     #get the number of patches in the target block
+    #     num_patches_block = int(patch_h * patch_w * scale)
+    #     #get the height and width of the target block with aspect ratio
+    #     block_h = int(torch.sqrt(torch.tensor(num_patches_block / aspect_ratio)))
+    #     block_w = int(aspect_ratio * block_h)
+    #     #get the starting patch
+    #     start_patch_h = torch.randint(0, patch_h - block_h+1, (1,)).item()
+    #     start_patch_w = torch.randint(0, patch_w - block_w+1, (1,)).item()
+    #     start_patch = start_patch_h * patch_w + start_patch_w
+    #     #get the patches in the context_block
+    #     patches = []
+    #     for i in range(block_h):
+    #         for j in range(block_w):
+    #             if start_patch + i * patch_w + j not in target_patches: #remove the target patches
+    #                 patches.append(start_patch + i * patch_w + j)
+    #     return x[:, patches, :]
     
     def get_patch_embeddings(self, x):
         B = x.shape[0]
