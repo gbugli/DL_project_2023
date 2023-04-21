@@ -381,7 +381,7 @@ class IJEPA_base(nn.Module):
       #select all frames which are not masked
       index = torch.ones(x.shape[1], dtype=bool)
       index[mask_indices] = False
-      context_block = x[index]
+      context_block = x[:,index]
       context_block = rearrange(context_block, 'b t (h w) m -> b (t h w) m',b=B,t=(T-self.M),w=W)
       return context_block
     
@@ -421,7 +421,7 @@ class IJEPA_base(nn.Module):
         target_blocks, all_blocks, mask_indices = self.get_target_block(self.teacher_encoder,x,B,T,W)
 
         #get context embeddings
-        context_block = self.get_context_block(all_blocks, B, T, W, mask_indices)
+        context_block = self.get_context_block(x, B, T, W, mask_indices)
 
         context_encoding = self.student_encoder(context_block, B, T-self.M, W)
         context_encoding = self.norm(context_encoding)
@@ -434,7 +434,7 @@ class IJEPA_base(nn.Module):
         target_masks = target_masks + target_pos_embedding
         
         # Add time embedding
-        target_time_embed = self.time_embed.unsqueeze(1)[:,mask_indices]
+        target_time_embed = self.time_embed.unsqueeze(2)[:,mask_indices]
         target_masks = target_masks + target_time_embed
         
         target_masks = rearrange(target_masks, 'b t (h w) m -> b (t h w) m',b=B,t=self.M,w=W)
