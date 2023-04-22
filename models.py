@@ -238,11 +238,21 @@ class Block(nn.Module):
 
 
 class VisionTransformer(nn.Module):
-    """ Vision Transformere
+    """ Vision Transformer
     """
-    def __init__(self, embed_dim=768, depth=12,
-                    num_heads=12, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop_rate=0., attn_drop_rate=0.,
-                  drop_path_rate=0.1, hybrid_backbone=None, norm_layer=nn.LayerNorm, num_frames=8, attention_type='divided_space_time', dropout=0.):
+    def __init__(self,
+                embed_dim=768,
+                depth=12,
+                num_heads=12,
+                mlp_ratio=4.,
+                qkv_bias=False,
+                qk_scale=None,
+                drop_rate=0.,
+                attn_drop_rate=0.,
+                drop_path_rate=0.1,
+                norm_layer=nn.LayerNorm,
+                attention_type='divided_space_time',
+                dropout=0.):
         super().__init__()
         self.attention_type = attention_type
         self.depth = depth
@@ -292,38 +302,44 @@ class VisionTransformer(nn.Module):
         x = self.norm(x)
         x = rearrange(x, 'b (h w t) m -> b t (h w) m',b=B,t=T,w=W)
         return x
-    # def forward_features(self, x):
-
-    #     ## Attention blocks
-    #     for blk in self.blocks:
-    #         x = blk(x, B, T, W)
-
-    #     ### Predictions for space-only baseline
-    #     if self.attention_type == 'space_only':
-    #         x = rearrange(x, '(b t) n m -> b t n m',b=B,t=T)
-    #         x = torch.mean(x, 1) # averaging predictions for every frame
-
-    #     x = self.norm(x)
-
-    #     return x
-
-    # def forward(self, x):
-    #     x = self.forward_features(x)
-    #     return x
 
 
 class IJEPA_base(nn.Module):
-    def __init__(self, img_size=224, patch_size=16, in_chans=3, embed_dim=768, enc_depth=12, pred_depth=12, num_heads=12,
-                  mlp_ratio=4., qkv_bias=False, qk_scale=None, drop_rate=0., attn_drop_rate=0.,
-                 drop_path_rate=0.1, hybrid_backbone=None, norm_layer=nn.LayerNorm, num_frames=22, attention_type='divided_space_time', dropout=0.,
-                 mode="train", M=4):
+    def __init__(self,
+                img_size=224,
+                patch_size=16,
+                in_chans=3,
+                norm_layer=nn.LayerNorm,
+                num_frames=22,
+                attention_type='divided_space_time',
+                dropout=0.,
+                mode="train",
+                M=4,
+                # encoder parameters
+                embed_dim=768,
+                enc_depth=12,
+                enc_num_heads=12,
+                enc_mlp_ratio=4.,
+                enc_qkv_bias=False,
+                enc_qk_scale=None,
+                enc_drop_rate=0.,
+                enc_attn_drop_rate=0.,
+                enc_drop_path_rate=0.1,
+                # predictor parameters
+                pred_depth=12,
+                pred_num_heads=12,
+                pred_mlp_ratio=4.,
+                pred_qkv_bias=False,
+                pred_qk_scale=None,
+                pred_drop_rate=0.,
+                pred_attn_drop_rate=0.,
+                pred_drop_path_rate=0.1):
         super().__init__()
         self.mode = mode
         self.dropout = dropout
         self.mask_token = nn.Parameter(torch.randn(1, 1, embed_dim))
         nn.init.trunc_normal_(self.mask_token, 0.02)
         self.M = M # number of masked frames
-        ####
 
         self.norm_layer = norm_layer
         self.norm = norm_layer(embed_dim)
@@ -342,19 +358,33 @@ class IJEPA_base(nn.Module):
 
         self.teacher_encoder = VisionTransformer(
             embed_dim=embed_dim,
-            num_heads=num_heads,
+            num_heads=enc_num_heads,
             depth=enc_depth, 
             dropout=self.dropout,
-            norm_layer=self.norm_layer
+            norm_layer=self.norm_layer,
+            mlp_ratio=enc_mlp_ratio,
+            attention_type=attention_type,
+            qkv_bias=enc_qkv_bias,
+            qk_scale=enc_qk_scale,
+            drop_rate=enc_drop_rate,
+            attn_drop_rate=enc_attn_drop_rate,
+            drop_path_rate=enc_drop_path_rate
         )
 
         self.student_encoder = copy.deepcopy(self.teacher_encoder).cpu()
         self.predictor = VisionTransformer(
             embed_dim=embed_dim,
-            num_heads=num_heads,
-            depth=enc_depth, 
+            num_heads=pred_num_heads,
+            depth=pred_depth, 
             dropout=self.dropout,
-            norm_layer=self.norm_layer
+            norm_layer=self.norm_layer,
+            mlp_ratio=pred_mlp_ratio,
+            attention_type=attention_type,
+            qkv_bias=pred_qkv_bias,
+            qk_scale=pred_qk_scale,
+            drop_rate=pred_drop_rate,
+            attn_drop_rate=pred_attn_drop_rate,
+            drop_path_rate=pred_drop_path_rate
         )
         
 
