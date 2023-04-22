@@ -117,6 +117,8 @@ class VideoFrameDataset(torch.utils.data.Dataset):
                  frames_per_segment: int = 1,
                  imagefile_template: str='image_{:d}.png',
                  transform = None,
+                 mask: bool =False,
+                 mask_template: str='mask.npy',
                  test_mode: bool = False):
         super(VideoFrameDataset, self).__init__()
 
@@ -126,6 +128,8 @@ class VideoFrameDataset(torch.utils.data.Dataset):
         self.frames_per_segment = frames_per_segment
         self.imagefile_template = imagefile_template
         self.transform = transform
+        self.mask = mask
+        self.mask_template = mask_template
         self.test_mode = test_mode
 
         self._parse_annotationfile()
@@ -133,6 +137,9 @@ class VideoFrameDataset(torch.utils.data.Dataset):
 
     def _load_image(self, directory: str, idx: int) -> Image.Image:
         return Image.open(os.path.join(directory, self.imagefile_template.format(idx))).convert('RGB')
+    
+    def _load_mask(self, directory: str) -> torch.Tensor:
+        return torch.Tensor(np.load(os.path.join(directory, self.mask_template)))
 
     def _parse_annotationfile(self):
         self.video_list = [VideoRecord(x.strip().split(), self.root_path) for x in open(self.annotationfile_path)]
@@ -239,6 +246,10 @@ class VideoFrameDataset(torch.utils.data.Dataset):
 
         if self.transform is not None:
             images = self.transform(images)
+
+        if self.mask:
+            mask = self._load_mask(record.path)
+            return images, record.label, mask
 
         return images, record.label
 
