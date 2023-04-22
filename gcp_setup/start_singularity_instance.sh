@@ -23,7 +23,7 @@ set -e
 
 IMAGE=${IMAGE:-/scratch/$USER/singularity_files/pytorch_22.08-py3.sif}
 
-INSTANCE_NAME=${INSTANCE_NAME:-cds_capstone_container}
+INSTANCE_NAME=${INSTANCE_NAME:-dl_container}
 
 
 # Set temporary directory in case it is not set
