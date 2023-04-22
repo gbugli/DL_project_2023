@@ -1,0 +1,47 @@
+{
+  "jepa_model": {
+    "img_size": <image size>,
+    "patch_size": <patch size>,
+    "in_chans": <number of input channels>,
+    "norm_layer": <normalization layer>,
+    "num_frames": <number of frames>,
+    "attention_type": <attention type>,
+    "dropout": <dropout probability>,
+    "mode": <model mode: 'train' for pre-training or 'test' for inference>,
+    "M": <number of masks for self-supervised pre-training>,
+    "embed_dim": <embedding dimension>,
+    "enc_depth":,
+    "enc_num_heads":,
+    "enc_mlp_ratio":,
+    "enc_qkv_bias":,
+    "enc_qk_scale":,
+    "enc_drop_rate":,
+    "enc_attn_drop_rate":,
+    "enc_drop_path_rate":,
+    "pred_depth":,
+    "pred_num_heads":,
+    "pred_mlp_ratio":,
+    "pred_qkv_bias":,
+    "pred_qk_scale":,
+    "pred_drop_rate":,
+    "pred_attn_drop_rate":,
+    "pred_drop_path_rate":
+  },
+  "data": {
+    "path": <path to dataset dir>>,
+    "batch_size": <batch size>
+  },
+  "optimizer": {
+    "name": <name of the optimizer as in torch.optim>,
+    "args": <arguments of the optimizer>
+  },
+  "lr_scheduler": {
+    "name": <name of the LR scheduler as in torch.optim.lr_scheduler>,
+    "args": <arguments of the LR scheduler>
+  },
+  "training": {
+    "epochs": <number of epochs>,
+    "early_stopping_patience": <number of epochs for early stopping>,
+    "gradient_clipping_norm": <norm value for gradient clipping>
+  }
+}

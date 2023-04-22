@@ -315,8 +315,8 @@ class IJEPA_base(nn.Module):
                 dropout=0.,
                 mode="train",
                 M=4,
-                # encoder parameters
                 embed_dim=768,
+                # encoder parameters
                 enc_depth=12,
                 enc_num_heads=12,
                 enc_mlp_ratio=4.,
