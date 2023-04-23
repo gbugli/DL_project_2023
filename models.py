@@ -383,7 +383,10 @@ class IJEPA_base(nn.Module):
                 pred_qk_scale=None,
                 pred_drop_rate=0.,
                 pred_attn_drop_rate=0.,
-                pred_drop_path_rate=0.1):
+                pred_drop_path_rate=0.1,
+                # positional and spacial embedding parameters
+                pos_drop_rate=0.,
+                time_drop_rate=0.):
         super().__init__()
         self.mode = mode
         self.dropout = dropout
@@ -400,11 +403,11 @@ class IJEPA_base(nn.Module):
         num_patches = self.patch_embed.num_patches
         
         self.pos_embed = nn.Parameter(torch.zeros(1, num_patches, embed_dim)) # self.pos_embed = nn.Parameter(torch.zeros(1, num_patches+1, embed_dim))
-        self.pos_drop = nn.Dropout(p=drop_rate)
+        self.pos_drop = nn.Dropout(p=pos_drop_rate)
 
         if self.attention_type != 'space_only':
             self.time_embed = nn.Parameter(torch.zeros(1, num_frames, embed_dim))
-            self.time_drop = nn.Dropout(p=drop_rate)
+            self.time_drop = nn.Dropout(p=time_drop_rate)
 
         self.teacher_encoder = VisionTransformer(
             embed_dim=embed_dim,

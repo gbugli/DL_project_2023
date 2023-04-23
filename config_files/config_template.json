@@ -25,7 +25,9 @@
     "pred_qk_scale":,
     "pred_drop_rate":,
     "pred_attn_drop_rate":,
-    "pred_drop_path_rate":
+    "pred_drop_path_rate":,
+    "pos_drop_rate":,
+    "time_drop_rate":
   },
   "data": {
     "path": <path to dataset dir>>,
