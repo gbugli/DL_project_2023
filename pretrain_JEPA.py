@@ -107,12 +107,13 @@ if __name__ == "__main__":
     args = parse_args()
     dataloader = load_data(args.root,args.annotation_file)
 
+    # All these hyperparamters we might want to have a config file to choose them and use a custom Config class to parse
     num_epochs = 10
     total_steps = num_epochs * len(dataloader)
     div_factor = 5 # max_lr/div_factor = initial lr
     final_div_factor = 10 # final lr is initial_lr/final_div_factor 
 
-    # Used this approach so that we can getv back to training the loaded model from checkpoint
+    # Used this approach so that we can get back to training the loaded model from checkpoint
     epoch = 0
 
     # get these params from a global config?

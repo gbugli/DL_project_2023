@@ -47,6 +47,7 @@ def load_data(root, annotation_file):
         frames_per_segment=22,
         imagefile_template='image_{:d}.png',
         transform=preprocess,
+        mask=True,
         test_mode=False
     )
 
@@ -74,6 +75,7 @@ def load_validation_data(val_folder, annotation_file_path):
         frames_per_segment=22,
         imagefile_template='image_{:d}.png',
         transform=preprocess,
+        mask=True,
         test_mode=False
     )
 
@@ -94,8 +96,8 @@ def train_model(epoch, decoder, encoder, criterion, optimizer, scheduler, datalo
         # do we need to do encoder.eval() or something? Since we are not training it, we want to deactivate the dropouts
         train_loss = 0
         for i, data in enumerate(dataloader, 0):
-            inputs, target_masks = data # does the dataloader load the masks yet?
-            #inputs, labels = inputs.to(device), labels.to(device)
+            inputs, labels, target_masks = data 
+            #inputs, labels, target_masks = inputs.to(device), labels.to(device)
 
             optimizer.zero_grad()
 
@@ -103,8 +105,13 @@ def train_model(epoch, decoder, encoder, criterion, optimizer, scheduler, datalo
             predicted_embeddings = encoder(inputs.transpose(1, 2))
             print(predicted_embeddings.shape) # not sure the exact shape of this output
 
+            # Reshape predicted embeddings to (b t) (h w) m
+
+
             ### forward pass through decoder to get the masks
             predicted_masks = decoder(predicted_embeddings)
+
+            # the target_mask tensor is of shape b f h w
 
             ### compute the loss and step
             loss = criterion(predicted_masks, target_masks)
@@ -156,7 +163,7 @@ def train_model(epoch, decoder, encoder, criterion, optimizer, scheduler, datalo
             'optimizer_state_dict': optimizer.state_dict(),
             'scheduler_state_dict': scheduler.state_dict(),
             #'early_stop': early_stop,
-            }, os.path.join(output_dir, 'models/partial', "checkpoint.pkl"))
+            }, os.path.join(output_dir, 'models/partial', "checkpoint_decoder.pkl"))
 
     return {
         "epochs": epoch,
