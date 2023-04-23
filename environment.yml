@@ -1,4 +1,4 @@
-name: pDL
+name: DL_project_2023
 channels:
   - conda-forge
   - pytorch
@@ -12,6 +12,7 @@ dependencies:
   - pytorch
   - torchvision
   - torchtext
+  - torchmetrics
   - opencv
   - librosa
   - nb_conda_kernels
@@ -19,3 +20,4 @@ dependencies:
   - pip:
     - torchviz
     - einops
+    - torchmetrics

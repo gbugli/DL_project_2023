@@ -40,5 +40,5 @@ singularity exec --containall --no-home --bind $HOME/.ssh -B /scratch/$USER/DL_p
     $IMAGE_DIRECTORY/pytorch_22.08-py3.sif /bin/bash << 'EOF'
 conda env create -f environment.yml
 source ~/.bashrc
-source activate pDL
+source activate DL_project_2023
 EOF
