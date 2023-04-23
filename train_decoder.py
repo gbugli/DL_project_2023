@@ -131,8 +131,8 @@ def train_model(epoch, decoder, encoder, criterion, optimizer, scheduler, datalo
         jaccard_scores = []
         with torch.no_grad():
             for data in validationloader:
-                inputs, target_masks = data
-                #images, labels = images.to(device), labels.to(device)
+                inputs, labels, target_masks = data
+                #inputs, labels, target_masks = images.to(device), labels.to(device)
 
                 ### compute predictions
                 predicted_embeddings = encoder(inputs.transpose(1, 2))
