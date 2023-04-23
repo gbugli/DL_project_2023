@@ -82,7 +82,7 @@ def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, num_e
 
         # TO DO: Implement Early Stopping?? Based on what?
 
-        # Used this approach (while and epoch increase) so that we can getv back to training the loaded model from checkpoint
+        # Used this approach (while and epoch increase) so that we can get back to training the loaded model from checkpoint
         epoch += 1
 
         # Checkpoint
@@ -115,6 +115,7 @@ if __name__ == "__main__":
     # Used this approach so that we can getv back to training the loaded model from checkpoint
     epoch = 0
 
+    # get these params from a global config?
     model = IJEPA_base(img_size=128, patch_size=8, enc_depth=6, pred_depth=6, num_heads=8)
     criterion = nn.MSELoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=0.05)
