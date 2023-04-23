@@ -110,16 +110,37 @@ if __name__ == "__main__":
     # All these hyperparamters we might want to have a config file to choose them and use a custom Config class to parse
     num_epochs = 10
     total_steps = num_epochs * len(dataloader)
-    div_factor = 5 # max_lr/div_factor = initial lr
-    final_div_factor = 10 # final lr is initial_lr/final_div_factor 
+    div_factor = 10 # max_lr/div_factor = initial lr
+    final_div_factor = 100 # final lr is initial_lr/final_div_factor 
 
     # Used this approach so that we can get back to training the loaded model from checkpoint
     epoch = 0
 
     # get these params from a global config?
-    model = IJEPA_base(img_size=128, patch_size=8, enc_depth=6, pred_depth=6, num_heads=8)
+    model = IJEPA_base(img_size=128, patch_size=8, in_chans=3, norm_layer=nn.LayerNorm, num_frames=22, attention_type='divided_space_time', dropout=0.1, mode="train", M=4, embed_dim=384,
+                        # encoder parameters
+                        enc_depth=18,
+                        enc_num_heads=6,
+                        enc_mlp_ratio=4.,
+                        enc_qkv_bias=False,
+                        enc_qk_scale=None,
+                        enc_drop_rate=0.,
+                        enc_attn_drop_rate=0.,
+                        enc_drop_path_rate=0.1,
+                        # predictor parameters
+                        pred_depth=18,
+                        pred_num_heads=6,
+                        pred_mlp_ratio=4.,
+                        pred_qkv_bias=False,
+                        pred_qk_scale=None,
+                        pred_drop_rate=0.1,
+                        pred_attn_drop_rate=0.1,
+                        pred_drop_path_rate=0.1,
+                        # positional and spacial embedding parameters
+                        pos_drop_rate=0.1,
+                        time_drop_rate=0.1)
     criterion = nn.MSELoss()
-    optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=0.05)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=0.0005)
     scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=0.003, total_steps=total_steps, div_factor=div_factor, final_div_factor=final_div_factor)
 
     if args.resume:
