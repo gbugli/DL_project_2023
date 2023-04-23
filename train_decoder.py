@@ -21,17 +21,13 @@ from eval import compute_jaccard
 def parse_args() -> Namespace:
     parser = ArgumentParser("Decoder")
     parser.add_argument("--train-dir", help="Name of dir with training data", required=True, type=str)
-    parser.add_argument("--train-annotation-file", help="Name of dir with annotation files",
-                        required=True, type=str)
     parser.add_argument("--val-dir", help="Name of dir with validation data", required=True, type=str)
-    parser.add_argument("--val-annotation-file", help="Name of dir with annotation files",
-                        required=True, type=str)
     parser.add_argument("--output-dir", required=True, type=str, help="Name of dir to save the checkpoints to")
     parser.add_argument("--resume", default=False, type=bool, help="In case training was not completed resume from last epoch")
 
     return parser.parse_args()
 
-def load_data(root, annotation_file):
+def load_data(root, annotation_file, batch_size=2):
     preprocess = transforms.Compose([
             ImglistToTensor(),  # list of PIL images to (FRAMES x CHANNELS x HEIGHT x WIDTH) tensor
             # transforms.Resize(299),  # image batch, resize smaller edge to 299
@@ -53,14 +49,14 @@ def load_data(root, annotation_file):
 
     dataloader = torch.utils.data.DataLoader(
             dataset=dataset,
-            batch_size=2,
+            batch_size=batch_size,
             shuffle=True,
             num_workers=1,
             pin_memory=True
         )
     return dataloader
 
-def load_validation_data(val_folder, annotation_file_path):
+def load_validation_data(val_folder, annotation_file_path, batch_size=2):
     #same preprocessing as in training, since we are not doing any augmentation here
     preprocess = transforms.Compose([
             ImglistToTensor(),  # list of PIL images to (FRAMES x CHANNELS x HEIGHT x WIDTH) tensor
@@ -81,7 +77,7 @@ def load_validation_data(val_folder, annotation_file_path):
 
     validationloader = torch.utils.data.DataLoader(
             dataset=dataset,
-            batch_size=2,
+            batch_size=batch_size,
             shuffle=True,
             num_workers=1,
             pin_memory=True
@@ -126,8 +122,7 @@ def train_model(epoch, decoder, encoder, criterion, optimizer, scheduler, datalo
 
         # Validation loss
         decoder.eval()
-        correct = 0
-        total = 0
+        val_loss = 0
         jaccard_scores = []
         with torch.no_grad():
             for data in validationloader:
@@ -138,20 +133,20 @@ def train_model(epoch, decoder, encoder, criterion, optimizer, scheduler, datalo
                 predicted_embeddings = encoder(inputs.transpose(1, 2))
                 predicted_masks = decoder(predicted_embeddings) # not sure if correct shape or need to rearrange first
 
-                ## want to go from ( (b t) h w num_classes) to ((b t) h w) where each pixel is a class number
-                _, predicted = torch.max(predicted_masks.data, 2) # 2 should be the dimension of the num_classes
+                # compute loss
+                val_loss += criterion(predicted_masks, target_masks)
 
-                total += target_masks.size(0) * target_masks.size(1) * target_masks.size(2) # multiply by the height and width of the image
-                correct += (predicted == target_masks).sum().item() # will this work in 3 dimensions?
+                ## want to go from batch * frames x height x width x num_classes with logits to batch * frames x height x width with class predictions
+                _, predicted = torch.max(predicted_masks.data, 2) # 2 should be the dimension of the num_classes
                 jaccard_scores.append(compute_jaccard(predicted, target_masks))
         
         # per-pixel accuracy on validation set
         # is this a good metric? Probably not
-        val_acc = 100 * correct / total
+        avg_val_loss = val_loss / len(validationloader)
         average_jaccard = sum(jaccard_scores) / len(jaccard_scores)
 
         current_lr = optimizer.param_groups[0]['lr']
-        print(f"Epoch: {epoch + 1}, Learning Rate: {current_lr:.6f}, Average epoch train loss: {avg_epoch_loss:.4f}, Validation accuracy: {val_acc:.4f}, Average Jaccard score: {average_jaccard:.4f}")
+        print(f"Epoch: {epoch + 1}, Learning Rate: {current_lr:.6f}, Avg train loss: {avg_epoch_loss:.4f}, Avg val loss: {avg_val_loss:.4f}, Avg Jaccard: {average_jaccard:.4f}")
 
         # Used this approach (while and epoch increase) so that we can get back to training the loaded model from checkpoint
         epoch += 1
@@ -176,8 +171,17 @@ if __name__ == "__main__":
     device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
 
     args = parse_args()
-    dataloader = load_data(args.train_folder, args.train_annotation_file)
-    validationloader = load_validation_data(args.val_folder, args.val_annotation_file)
+
+    batch_size = 128
+
+    # Load train data and validation data
+    train_data_dir  = os.path.join(args.train_dir, 'data')
+    train_annotation_dir = os.path.join(args.root, 'annotations.txt')
+    val_data_dir  = os.path.join(args.val_dir, 'data')
+    val_annotation_dir = os.path.join(args.val_dir, 'annotations.txt')
+
+    dataloader = load_data(train_data_dir, train_annotation_dir, batch_size)
+    validationloader = load_validation_data(val_data_dir, val_annotation_dir, batch_size)
 
     num_epochs = 10
     total_steps = num_epochs * len(dataloader)
@@ -190,7 +194,31 @@ if __name__ == "__main__":
     epoch = 0
 
     # get these params from global config? to ensure that it always matches the trained IJEPA model
-    encoder = IJEPA_base(img_size=128, patch_size=8, enc_depth=6, pred_depth=6, num_heads=8)
+    # load encoder
+    encoder = IJEPA_base(img_size=128, patch_size=8, in_chans=3, norm_layer=nn.LayerNorm, num_frames=22, attention_type='divided_space_time', dropout=0.1, mode="train", M=4, embed_dim=384,
+                        # encoder parameters
+                        enc_depth=18,
+                        enc_num_heads=6,
+                        enc_mlp_ratio=4.,
+                        enc_qkv_bias=False,
+                        enc_qk_scale=None,
+                        enc_drop_rate=0.,
+                        enc_attn_drop_rate=0.,
+                        enc_drop_path_rate=0.1,
+                        # predictor parameters
+                        pred_depth=18,
+                        pred_num_heads=6,
+                        pred_mlp_ratio=4.,
+                        pred_qkv_bias=False,
+                        pred_qk_scale=None,
+                        pred_drop_rate=0.1,
+                        pred_attn_drop_rate=0.1,
+                        pred_drop_path_rate=0.1,
+                        # positional and spacial embedding parameters
+                        pos_drop_rate=0.1,
+                        time_drop_rate=0.1)
+
+    # load decoder       
     decoder = Decoder(input_dim=768, hidden_dim=3072, num_hidden_layers=2)
     criterion = nn.CrossEntropyLoss() # since we will have label predictions?
 
@@ -209,7 +237,7 @@ if __name__ == "__main__":
         print("Attempting to find existing checkpoint")
         path_partials = os.path.join(args.output_dir, "models/partial")
         if os.path.exists(path_partials):
-            checkpoint = torch.load(os.path.join(path_partials, "decoder_checkpoint.pkl"), map_location=device)
+            checkpoint = torch.load(os.path.join(path_partials, "checkpoint_decoder.pkl"), map_location=device)
             decoder.load_state_dict(checkpoint['model_state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
