@@ -13,7 +13,7 @@ import warnings
 from video_dataset import VideoFrameDataset, ImglistToTensor
 from argparse import ArgumentParser, Namespace
 
-from models import Decoder
+from decoders import Decoder
 from models import IJEPA_base
 
 from eval import compute_jaccard
