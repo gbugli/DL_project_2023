@@ -14,7 +14,7 @@ import warnings
 from video_dataset import VideoFrameDataset, ImglistToTensor
 from argparse import ArgumentParser, Namespace
 
-from models import IJEPA_base
+from models import IJEPA_base, CustomDataParallel
 
 def parse_args() -> Namespace:
     parser = ArgumentParser("JEPA")
@@ -107,7 +107,8 @@ def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_d
         #scheduler.step()
 
         ### Validation
-        with model.eval():
+        model.eval()
+        with torch.no_grad():
           val_loss = 0
           for i, data in enumerate(val_dataloader, 0):
               inputs, labels = data
@@ -148,10 +149,10 @@ if __name__ == "__main__":
     device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
 
     # All these hyperparamters we might want to have a config file to choose them and use a custom Config class to parse
-    num_epochs = 10
+    num_epochs = 100
     div_factor = 10 # max_lr/div_factor = initial lr
     final_div_factor = 100 # final lr is initial_lr/final_div_factor 
-    batch_size = 8
+    batch_size = 2
 
     args = parse_args()
 
@@ -199,6 +200,10 @@ if __name__ == "__main__":
                         # positional and spacial embedding parameters
                         pos_drop_rate=0.1,
                         time_drop_rate=0.1)
+
+    if torch.cuda.device_count() > 1:
+        model = CustomDataParallel(model)
+        print("Model training will be distributed to {} GPUs.".format(torch.cuda.device_count()))
     model.to(device)
     criterion = nn.MSELoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=0.0005)

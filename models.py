@@ -99,6 +99,14 @@ def drop_path(x, drop_prob: float = 0., training: bool = False):
 #     def stop_training(self, current_epoch) -> bool:
 #         return current_epoch - self.best_epoch > self.patience
 
+class CustomDataParallel(nn.DataParallel):
+    """
+    Wrapper for scoring with nn.DataParallel object containing LTRModel.
+    """
+
+    def forward(self, x):
+        return self.module.forward(x)  # type: ignore
+
 
 class DropPath(nn.Module):
     """Drop paths (Stochastic Depth) per sample  (when applied in main path of residual blocks).
