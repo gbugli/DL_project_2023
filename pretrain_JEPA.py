@@ -204,12 +204,9 @@ if __name__ == "__main__":
                         # positional and spacial embedding parameters
                         pos_drop_rate=0.1,
                         time_drop_rate=0.1)
-
-    if torch.cuda.device_count() > 1:
-        # model = CustomDataParallel(model)
-        # print("Model training will be distributed to {} GPUs.".format(torch.cuda.device_count()))
-        model = nn.DataParallel(model)
+    # Leave this to load properly the optimizer dict
     model.to(device)
+
     criterion = nn.MSELoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=0.0005)
 
@@ -226,6 +223,13 @@ if __name__ == "__main__":
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
             epoch = checkpoint['epoch']
+            print(f'Resuming training from epoch {epoch}')
+    
+    if torch.cuda.device_count() > 1:
+        # model = CustomDataParallel(model)
+        print("Model training will be distributed to {} GPUs.".format(torch.cuda.device_count()))
+        model = nn.DataParallel(model)
+    model.to(device)
 
     print('Start training model...')
     results = train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_dataloader, num_epochs, save_dir, device)
