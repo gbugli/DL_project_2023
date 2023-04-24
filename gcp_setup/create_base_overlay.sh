@@ -41,5 +41,5 @@ singularity exec --containall --no-home --bind $HOME/.ssh -B /scratch/$USER/DL_p
 conda env create -f /environment.yml
 conda init bash
 source ~/.bashrc
-source activate DL_project_2023
+conda activate DL_project_2023
 EOF
