@@ -38,7 +38,8 @@ echo "Cloning base packages into overlay"
 singularity exec --containall --no-home --bind $HOME/.ssh -B /scratch/$USER/DL_project_2023/environment.yml:/environment.yml\
     --overlay overlay-base.ext3 \
     $IMAGE_DIRECTORY/pytorch_22.08-py3.sif /bin/bash << 'EOF'
-conda env create -f environment.yml
+conda env create -f /environment.yml
+conda init bash
 source ~/.bashrc
 source activate DL_project_2023
 EOF

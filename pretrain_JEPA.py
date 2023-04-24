@@ -20,8 +20,8 @@ def parse_args() -> Namespace:
     # parser.add_argument("--config-file-name", required=True, type=str, help="Name of json file with config")
     parser.add_argument("--root", help="Name of dir with data", required=True, type=str)
     parser.add_argument("--val-dir", help="Name of dir with validation data", required=True, type=str)
-    parser.add_argument("--output-dir", required=True, type=str, help="Name of dir to save the checkpoints to")
-    parser.add_argument("--resume", default=False, type=bool, help="In case training was not completed resume from last epoch")
+    parser.add_argument("--output-dir", help="Name of dir to save the checkpoints to", required=True, type=str)
+    parser.add_argument("--resume", help="In case training was not completed resume from last epoch", default=False, type=bool)
 
     return parser.parse_args()
 

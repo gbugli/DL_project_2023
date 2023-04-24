@@ -47,6 +47,7 @@ if [[ ! -f $TMP_OVERLAY ]]; then
 
 echo "Temporary overlay not found, automatically creating a new one."
 cp "$OVERLAY_DIRECTORY/$TMP_OVERLAY_SOURCE.gz" "$TMPDIR"
+cp "/scratch/$USER/Dataset_Student.sqsh" "$TMPDIR"
 gunzip "$TMPDIR/$TMP_OVERLAY_SOURCE.gz"
 mv "$TMPDIR/$TMP_OVERLAY_SOURCE" "$TMP_OVERLAY"
 
@@ -65,6 +66,7 @@ fi
 # --overlay overlay-packages.ext3: overlay with our installed packages, created by scripts/create_package_overlay.sh
 
 singularity instance start --containall --no-home -B $HOME/.ssh -B /scratch -B $PWD --nv \
+    --overlay /tmp/Dataset_Student.sqsh \
     --overlay overlay-temp.ext3 \
     --overlay overlay-base.ext3:ro \
     $IMAGE ${INSTANCE_NAME}
