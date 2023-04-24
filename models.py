@@ -219,7 +219,7 @@ class Block(nn.Module):
         if self.attention_type in ['space_only', 'joint_space_time']:
             x = x + self.drop_path(self.attn(self.norm1(x)))
             x = x + self.drop_path(self.mlp(self.norm2(x)))
-            return x
+            return x.to(self.device)
         elif self.attention_type == 'divided_space_time':
             ## Temporal
             xt = x # xt = x[:,1:,:]
