@@ -158,7 +158,9 @@ if __name__ == "__main__":
     val_data_dir  = os.path.join(args.val_dir, 'data')
     val_annotation_dir = os.path.join(args.val_dir, 'annotations.txt')
 
+    print('Loading train data...')
     dataloader = load_data(unlabeled_data_dir, unlabeled_annotation_dir, batch_size)
+    print('Loading val data...')
     val_dataloader = load_validation_data(val_data_dir, val_annotation_dir, batch_size)
 
     # Used this approach so that we can get back to training the loaded model from checkpoint
@@ -204,5 +206,6 @@ if __name__ == "__main__":
             scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
             epoch = checkpoint['epoch']
 
+    print('Start training model...')
     results = train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_dataloader, num_epochs, args.output_dir, device)
     print(f'Model training finshed at epoch {results["epoch"]}, trainig loss: {results["train_loss"]}')

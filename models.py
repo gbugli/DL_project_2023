@@ -222,9 +222,9 @@ class Block(nn.Module):
         elif self.attention_type == 'divided_space_time':
             ## Temporal
             xt = x # xt = x[:,1:,:]
-            xt = rearrange(xt, 'b (h w t) m -> (b h w) t m',b=B,h=H,w=W,t=T)
+            xt = rearrange(xt, 'b (h w t) m -> (b h w) t m',b=B,w=W,t=T)
             res_temporal = self.drop_path(self.temporal_attn(self.temporal_norm1(xt)))
-            res_temporal = rearrange(res_temporal, '(b h w) t m -> b (h w t) m',b=B,h=H,w=W,t=T)
+            res_temporal = rearrange(res_temporal, '(b h w) t m -> b (h w t) m',b=B,w=W,t=T)
             res_temporal = self.temporal_fc(res_temporal)
             xt = x + res_temporal # xt = x[:,1:,:] + res_temporal
 
@@ -233,7 +233,7 @@ class Block(nn.Module):
             # cls_token = init_cls_token.repeat(1, T, 1)
             # cls_token = rearrange(cls_token, 'b t m -> (b t) m',b=B,t=T).unsqueeze(1)
             xs = xt
-            xs = rearrange(xs, 'b (h w t) m -> (b t) (h w) m',b=B,h=H,w=W,t=T)
+            xs = rearrange(xs, 'b (h w t) m -> (b t) (h w) m',b=B,w=W,t=T)
             # xs = torch.cat((cls_token, xs), 1)
             res_spatial = self.drop_path(self.attn(self.norm1(xs)))
 
@@ -242,7 +242,7 @@ class Block(nn.Module):
             # cls_token = rearrange(cls_token, '(b t) m -> b t m',b=B,t=T)
             # cls_token = torch.mean(cls_token,1,True) ## averaging for every frame
             # res_spatial = res_spatial[:,1:,:]
-            res_spatial = rearrange(res_spatial, '(b t) (h w) m -> b (h w t) m',b=B,h=H,w=W,t=T)
+            res_spatial = rearrange(res_spatial, '(b t) (h w) m -> b (h w t) m',b=B,w=W,t=T)
             res = res_spatial
             x = xt
 
