@@ -331,6 +331,7 @@ class IJEPA_base(nn.Module):
                 mode="train",
                 M=4,
                 embed_dim=768,
+                device='cuda:0',
                 # encoder parameters
                 enc_depth=12,
                 enc_num_heads=12,
@@ -389,7 +390,7 @@ class IJEPA_base(nn.Module):
             drop_path_rate=enc_drop_path_rate
         )
 
-        self.student_encoder = copy.deepcopy(self.teacher_encoder).cpu()
+        self.student_encoder = copy.deepcopy(self.teacher_encoder).to(device)
         self.predictor = VisionTransformer(
             embed_dim=embed_dim,
             num_heads=pred_num_heads,
