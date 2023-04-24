@@ -21,6 +21,7 @@ def parse_args() -> Namespace:
     parser.add_argument("--root", help="Name of dir with data", required=True, type=str)
     parser.add_argument("--val-dir", help="Name of dir with validation data", required=True, type=str)
     parser.add_argument("--output-dir", help="Name of dir to save the checkpoints to", required=True, type=str)
+    parser.add_argument("--run-id", help="Name of the run", required=True, type=str)
     parser.add_argument("--resume", help="In case training was not completed resume from last epoch", default=False, type=bool)
 
     return parser.parse_args()
@@ -148,9 +149,15 @@ if __name__ == "__main__":
     num_epochs = 10
     div_factor = 10 # max_lr/div_factor = initial lr
     final_div_factor = 100 # final lr is initial_lr/final_div_factor 
-    batch_size = 128
+    batch_size = 64
 
     args = parse_args()
+
+    # Make run dir
+    if not os.path.exists(os.path.join(args.output_dir,args.run_id)):
+        os.makedirs(os.path.join(args.output_dir,args.run_id), exist_ok=True)
+    
+    save_dir = os.path.join(args.output_dir,args.run_id)
 
     # Load unlabeled data and validation data
     unlabeled_data_dir  = os.path.join(args.root, 'data')
@@ -198,7 +205,7 @@ if __name__ == "__main__":
 
     if args.resume:
         print("Attempting to find existing checkpoint")
-        path_partials = os.path.join(args.output_dir, "models/partial")
+        path_partials = os.path.join(save_dir, "models/partial")
         if os.path.exists(path_partials):
             checkpoint = torch.load(os.path.join(path_partials, "checkpoint.pkl"), map_location=device)
             model.load_state_dict(checkpoint['model_state_dict'])
@@ -207,5 +214,5 @@ if __name__ == "__main__":
             epoch = checkpoint['epoch']
 
     print('Start training model...')
-    results = train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_dataloader, num_epochs, args.output_dir, device)
+    results = train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_dataloader, num_epochs, save_dir, device)
     print(f'Model training finshed at epoch {results["epoch"]}, trainig loss: {results["train_loss"]}')
