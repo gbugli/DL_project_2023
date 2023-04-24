@@ -3,6 +3,7 @@ import gc
 import torch
 import torch.nn as nn
 from einops import rearrange
+import time
 # import imageio.v3 as iio
 import numpy as np
 import copy
@@ -86,6 +87,8 @@ def load_validation_data(val_dir, val_annotation_file, batch_size=2):
 # Train the model
 def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_dataloader, num_epochs, output_dir, device):
     while epoch < num_epochs:
+        print(f'Starting epoch {epoch + 1}')
+        start_time = time.time()
         model.train()
         train_loss = 0
         for i, data in enumerate(dataloader, 0):
@@ -104,6 +107,7 @@ def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_d
             scheduler.step()
         
         avg_epoch_loss = train_loss / len(dataloader)
+        end_time = time.time()
         #scheduler.step()
 
         ### Validation
@@ -121,7 +125,7 @@ def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_d
           avg_epoch_val_loss = val_loss / len(val_dataloader)
         
         current_lr = optimizer.param_groups[0]['lr']
-        print(f"Epoch: {epoch + 1}, Learning Rate: {current_lr:.6f}, Average epoch loss: {avg_epoch_loss:.4f}, Average epoch val loss: {avg_epoch_val_loss:.4f}")
+        print(f"Epoch: {epoch + 1}, Time for training epoch {end_time - start_time}, Learning Rate: {current_lr:.6f}, Average epoch loss: {avg_epoch_loss:.4f}, Average epoch val loss: {avg_epoch_val_loss:.4f}")
 
         # TO DO: Implement Early Stopping?? Based on what?
 
