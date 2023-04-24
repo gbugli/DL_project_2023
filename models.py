@@ -226,7 +226,7 @@ class Block(nn.Module):
             xt = rearrange(xt, 'b (h w t) m -> (b h w) t m',b=B,w=W,t=T).to(self.device)
             res_temporal = self.drop_path(self.temporal_attn(self.temporal_norm1(xt)))
             res_temporal = rearrange(res_temporal, '(b h w) t m -> b (h w t) m',b=B,w=W,t=T)
-            res_temporal = self.temporal_fc(res_temporal)
+            res_temporal = self.temporal_fc(res_temporal).to(self.device)
             xt = x + res_temporal # xt = x[:,1:,:] + res_temporal
 
             ## Spatial
