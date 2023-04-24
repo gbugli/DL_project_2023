@@ -22,6 +22,9 @@ cp $OVERLAY_DIRECTORY/$BASE_PACKAGES_OVERLAY.gz .
 gunzip $BASE_PACKAGES_OVERLAY.gz
 mv $BASE_PACKAGES_OVERLAY overlay-base.ext3
 
+export SINGULARITY_CACHEDIR=/tmp/$USER
+cp -rp /scratch/gb2572/Dataset_Student.sqsh /tmp
+
 
 # We execute the required commands to obtain a minimal
 # new conda environment at the location /ext3/conda/bootcamp
@@ -35,11 +38,17 @@ mv $BASE_PACKAGES_OVERLAY overlay-base.ext3
 # to make the directory appear, here we choose to bind $HOME/.ssh
 #
 echo "Cloning base packages into overlay"
-singularity exec --containall --no-home --bind $HOME/.ssh -B /scratch/$USER/DL_project_2023/environment.yml:/environment.yml\
+singularity exec --containall --no-home --bind $HOME/.ssh -B /scratch/$USER/DL_project_2023/requirements.txt:/requirements.txt\
+    --overlay /tmp/Dataset_Student.sqsh \
     --overlay overlay-base.ext3 \
     $IMAGE_DIRECTORY/pytorch_22.08-py3.sif /bin/bash << 'EOF'
-conda env create -f /environment.yml
+conda create --prefix /ext3/conda/dl-project --clone base
 conda init bash
 source ~/.bashrc
-conda activate DL_project_2023
+conda activate /ext3/conda/dl-project
+export TMPDIR=/ext3/tmp
+mkdir -p $TMPDIR
+pwd
+pip install -r /requirements.txt
+rm -rf $TMPDIR
 EOF

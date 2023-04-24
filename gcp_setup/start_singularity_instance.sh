@@ -1,14 +1,3 @@
-#! /bin/bash
-
-
-# This script is a utility script to help start singularity instance with the expected binds and overlays.
-# It is intended to be used in conjuction with the `scripts/create_base_overlay.sh` and `scripts/create_package_overlay.sh`
-# scripts which create the required overlays.
-
-# The behavior of this script may be configured to manage where the dataset overlay is loaded from
-# and where the temporary overlay is placed.
-
-
 set -e
 
 # The HUGGINGFACE_HUB_CACHE variable defines the directory containing
@@ -23,7 +12,7 @@ set -e
 
 IMAGE=${IMAGE:-/scratch/$USER/singularity_files/pytorch_22.08-py3.sif}
 
-INSTANCE_NAME=${INSTANCE_NAME:-dl_container}
+INSTANCE_NAME=${INSTANCE_NAME:-dl_project}
 
 
 # Set temporary directory in case it is not set
@@ -47,7 +36,6 @@ if [[ ! -f $TMP_OVERLAY ]]; then
 
 echo "Temporary overlay not found, automatically creating a new one."
 cp "$OVERLAY_DIRECTORY/$TMP_OVERLAY_SOURCE.gz" "$TMPDIR"
-cp "/scratch/$USER/Dataset_Student.sqsh" "$TMPDIR"
 gunzip "$TMPDIR/$TMP_OVERLAY_SOURCE.gz"
 mv "$TMPDIR/$TMP_OVERLAY_SOURCE" "$TMP_OVERLAY"
 
@@ -66,7 +54,6 @@ fi
 # --overlay overlay-packages.ext3: overlay with our installed packages, created by scripts/create_package_overlay.sh
 
 singularity instance start --containall --no-home -B $HOME/.ssh -B /scratch -B $PWD --nv \
-    --overlay /tmp/Dataset_Student.sqsh \
     --overlay overlay-temp.ext3 \
     --overlay overlay-base.ext3:ro \
     $IMAGE ${INSTANCE_NAME}
