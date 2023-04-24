@@ -158,6 +158,7 @@ if __name__ == "__main__":
         os.makedirs(os.path.join(args.output_dir,args.run_id), exist_ok=True)
     
     save_dir = os.path.join(args.output_dir,args.run_id)
+    os.makedirs(os.path.join(save_dir, "models/partial"), exist_ok=True)
 
     # Load unlabeled data and validation data
     unlabeled_data_dir  = os.path.join(args.root, 'data')
