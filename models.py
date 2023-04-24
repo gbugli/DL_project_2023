@@ -188,8 +188,9 @@ class Attention(nn.Module):
 class Block(nn.Module):
 
     def __init__(self, dim, num_heads, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop=0., attn_drop=0.,
-                 drop_path=0.1, act_layer=nn.GELU, norm_layer=nn.LayerNorm, attention_type='divided_space_time'):
+                 drop_path=0.1, act_layer=nn.GELU, norm_layer=nn.LayerNorm, attention_type='divided_space_time', device='cuda:0'):
         super().__init__()
+        self.device=device
         self.attention_type = attention_type
         assert(attention_type in ['divided_space_time', 'space_only','joint_space_time'])
 
@@ -222,7 +223,7 @@ class Block(nn.Module):
         elif self.attention_type == 'divided_space_time':
             ## Temporal
             xt = x # xt = x[:,1:,:]
-            xt = rearrange(xt, 'b (h w t) m -> (b h w) t m',b=B,w=W,t=T)
+            xt = rearrange(xt, 'b (h w t) m -> (b h w) t m',b=B,w=W,t=T).to(self.device)
             res_temporal = self.drop_path(self.temporal_attn(self.temporal_norm1(xt)))
             res_temporal = rearrange(res_temporal, '(b h w) t m -> b (h w t) m',b=B,w=W,t=T)
             res_temporal = self.temporal_fc(res_temporal)
@@ -388,7 +389,7 @@ class IJEPA_base(nn.Module):
             drop_rate=enc_drop_rate,
             attn_drop_rate=enc_attn_drop_rate,
             drop_path_rate=enc_drop_path_rate
-        )
+        ).to(device)
 
         self.student_encoder = copy.deepcopy(self.teacher_encoder).to(device)
         self.predictor = VisionTransformer(
@@ -404,7 +405,7 @@ class IJEPA_base(nn.Module):
             drop_rate=pred_drop_rate,
             attn_drop_rate=pred_attn_drop_rate,
             drop_path_rate=pred_drop_path_rate
-        )
+        ).to(device)
         
 
     @torch.no_grad() 
