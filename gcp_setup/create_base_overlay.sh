@@ -23,7 +23,7 @@ gunzip $BASE_PACKAGES_OVERLAY.gz
 mv $BASE_PACKAGES_OVERLAY overlay-base.ext3
 
 export SINGULARITY_CACHEDIR=/tmp/$USER
-cp -rp /scratch/$USER/Dataset_Student.sqsh /tmp
+cp -rp /scratch/$USER/Dataset_Student.sqsh /tmp/
 
 
 # We execute the required commands to obtain a minimal
