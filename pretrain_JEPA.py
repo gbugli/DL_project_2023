@@ -1,4 +1,5 @@
 import os
+import gc
 import torch
 import torch.nn as nn
 from einops import rearrange
@@ -89,7 +90,7 @@ def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_d
         train_loss = 0
         for i, data in enumerate(dataloader, 0):
             inputs, labels = data
-            #inputs, labels = inputs.to(device), labels.to(device)
+            inputs, labels = inputs.to(device), labels.to(device)
 
             optimizer.zero_grad()
 
@@ -110,7 +111,7 @@ def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_d
           val_loss = 0
           for i, data in enumerate(val_dataloader, 0):
               inputs, labels = data
-              #inputs, labels = inputs.to(device), labels.to(device)
+              inputs, labels = inputs.to(device), labels.to(device)
 
               prediction_blocks, target_blocks = model(inputs.transpose(1, 2))
               loss = criterion(prediction_blocks, target_blocks)
@@ -143,13 +144,14 @@ def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_d
 
 if __name__ == "__main__":
 
+    torch.cuda.empty_cache()
     device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
 
     # All these hyperparamters we might want to have a config file to choose them and use a custom Config class to parse
     num_epochs = 10
     div_factor = 10 # max_lr/div_factor = initial lr
     final_div_factor = 100 # final lr is initial_lr/final_div_factor 
-    batch_size = 32
+    batch_size = 8
 
     args = parse_args()
 
@@ -177,7 +179,7 @@ if __name__ == "__main__":
     # get these params from a global config?
     model = IJEPA_base(img_size=128, patch_size=8, in_chans=3, norm_layer=nn.LayerNorm, num_frames=22, attention_type='divided_space_time', dropout=0.1, mode="train", M=4, embed_dim=384, device=device,
                         # encoder parameters
-                        enc_depth=18,
+                        enc_depth=10,
                         enc_num_heads=6,
                         enc_mlp_ratio=4.,
                         enc_qkv_bias=False,
@@ -186,7 +188,7 @@ if __name__ == "__main__":
                         enc_attn_drop_rate=0.,
                         enc_drop_path_rate=0.1,
                         # predictor parameters
-                        pred_depth=18,
+                        pred_depth=10,
                         pred_num_heads=6,
                         pred_mlp_ratio=4.,
                         pred_qkv_bias=False,
@@ -197,6 +199,7 @@ if __name__ == "__main__":
                         # positional and spacial embedding parameters
                         pos_drop_rate=0.1,
                         time_drop_rate=0.1)
+    model.to(device)
     criterion = nn.MSELoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=0.0005)
 
