@@ -23,7 +23,7 @@ TMPDIR=${TMPDIR:-/tmp}
 # re-define it to some other value by setting an environment variable
 # before calling this script.
 TMP_OVERLAY=${TMP_OVERLAY:-overlay-temp.ext3}
-TMP_OVERLAY_SOURCE=${TMP_OVERLAY_SOURCE:-overlay-5GB-3.2M.ext3}
+TMP_OVERLAY_SOURCE=${TMP_OVERLAY_SOURCE:-overlay-15GB-500K.ext3}
 
 
 # Set this to the directory containing empty overlay images
