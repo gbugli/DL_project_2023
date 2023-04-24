@@ -56,4 +56,5 @@ fi
 singularity instance start --containall --no-home -B $HOME/.ssh -B /scratch -B $PWD --nv \
     --overlay overlay-temp.ext3 \
     --overlay overlay-base.ext3:ro \
+    --overlay /scratch/$USER/Dataset_Student.sqsh:ro \
     $IMAGE ${INSTANCE_NAME}
