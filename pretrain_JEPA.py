@@ -56,34 +56,6 @@ def load_data(root, annotation_file, batch_size=2):
         )
     return dataloader
 
-def load_validation_data(val_dir, val_annotation_file, batch_size=2):
-    preprocess = transforms.Compose([
-            ImglistToTensor(),  # list of PIL images to (FRAMES x CHANNELS x HEIGHT x WIDTH) tensor
-            # transforms.Resize(299),  # image batch, resize smaller edge to 299
-            transforms.Resize((128,128)),
-            # transforms.CenterCrop(299),  # image batch, center crop to square 299x299
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ])
-
-    dataset = VideoFrameDataset(
-        root_path=val_dir,
-        annotationfile_path=val_annotation_file,
-        num_segments=1,
-        frames_per_segment=22,
-        imagefile_template='image_{:d}.png',
-        transform=preprocess,
-        test_mode=False
-    )
-
-    dataloader = torch.utils.data.DataLoader(
-            dataset=dataset,
-            batch_size=batch_size,
-            shuffle=True,
-            num_workers=12,
-            pin_memory=True
-        )
-    return dataloader
-
 # Train the model
 def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_dataloader, num_epochs, output_dir, device, early_stop):
     while epoch < num_epochs:
@@ -196,7 +168,7 @@ if __name__ == "__main__":
     print('Loading train data...')
     dataloader = load_data(unlabeled_data_dir, unlabeled_annotation_dir, batch_size)
     print('Loading val data...')
-    val_dataloader = load_validation_data(val_data_dir, val_annotation_dir, batch_size)
+    val_dataloader = load_data(val_data_dir, val_annotation_dir, batch_size)
 
     # Used this approach so that we can get back to training the loaded model from checkpoint
     epoch = 0
