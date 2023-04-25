@@ -340,8 +340,6 @@ class ATMHead(nn.Module):
                     l_ = self.d4_to_d3(l_)
                     laterals.append(l_ + lateral)
 
-            print(q.shape)
-            print(lateral.shape)
             
             q, attn = decoder_(q, lateral.transpose(0, 1))
             attn = attn.transpose(-1, -2)

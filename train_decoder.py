@@ -98,6 +98,8 @@ def train_model(epoch, decoder, encoder, criterion, optimizer, scheduler, datalo
             inputs, labels, target_masks = data 
             inputs, labels, target_masks = inputs.to(device), labels.to(device), target_masks.to(device)
 
+            inputs = inputs[:, :11]
+
             optimizer.zero_grad()
 
             ### forward pass through encoder to get the embeddings
@@ -194,7 +196,7 @@ if __name__ == "__main__":
 
     args = parse_args()
 
-    batch_size = 128
+    batch_size = 2
 
     # Make run dir
     if not os.path.exists(os.path.join(args.output_dir,args.run_id)):
@@ -230,7 +232,7 @@ if __name__ == "__main__":
     # load encoder
     encoder = IJEPA_base(img_size=128, patch_size=8, in_chans=3, norm_layer=nn.LayerNorm, num_frames=22, attention_type='divided_space_time', dropout=0.1, mode="test", M=4, embed_dim=384,
                         # encoder parameters
-                        enc_depth=18,
+                        enc_depth=10,
                         enc_num_heads=6,
                         enc_mlp_ratio=4.,
                         enc_qkv_bias=False,
@@ -239,7 +241,7 @@ if __name__ == "__main__":
                         enc_attn_drop_rate=0.,
                         enc_drop_path_rate=0.1,
                         # predictor parameters
-                        pred_depth=18,
+                        pred_depth=10,
                         pred_num_heads=6,
                         pred_mlp_ratio=4.,
                         pred_qkv_bias=False,
@@ -251,10 +253,15 @@ if __name__ == "__main__":
                         pos_drop_rate=0.1,
                         time_drop_rate=0.1)
 
+    # for k,v in encoder.state_dict().items():
+    #     print(k)
+
     # load decoder       
     # decoder = Decoder(input_dim=768, hidden_dim=3072, num_hidden_layers=2)
-    decoder = ATMHead(img_size=128, H=160, W=240, in_channels=768, use_stages=1)
+    decoder = ATMHead(img_size=128, H=160, W=240, in_channels=384, use_stages=1)
+    decoder.to(device)
     criterion = ATMLoss(48, 1)
+    criterion.to(device)
     # criterion = nn.CrossEntropyLoss() # since we will have label predictions?
 
     # Just using same optimizer and scheduler as IJEPA, will need to change later
@@ -266,10 +273,19 @@ if __name__ == "__main__":
     path_best = os.path.join(save_dir, "models/best")
     if os.path.exists(path_best):
         checkpoint = torch.load(os.path.join(path_best, "best_model.pkl"), map_location=device)
-        encoder_state_dict = checkpoint['model_state_dict']
-        encoder_state_dict['mode'] = 'test'
+        encoder_state_dict = checkpoint # checkpoint['model_state_dict']
+        # encoder_state_dict['mode'] = 'test'
         encoder.load_state_dict(encoder_state_dict)
     encoder.to(device)
+
+    # path_partial = os.path.join(save_dir, "models/partial")
+    # if os.path.exists(path_partial):
+    #     checkpoint = torch.load(os.path.join(path_partial, "checkpoint.pkl"), map_location=device)
+    #     encoder_state_dict = checkpoint['model_state_dict']
+    #     # encoder_state_dict['mode'] = 'test'
+    #     encoder.load_state_dict(encoder_state_dict)
+    # encoder.to(device)
+
 
     early_stop = EarlyStop(patience)
 
@@ -284,6 +300,6 @@ if __name__ == "__main__":
             early_stop = checkpoint['early_stop']
             epoch = checkpoint['epoch']
 
-    results = train_model(epoch, decoder, encoder, criterion, optimizer, scheduler, dataloader, num_epochs, save_dir, device, early_stop)
+    results = train_model(epoch, decoder, encoder, criterion, optimizer, scheduler, dataloader, validationloader, num_epochs, save_dir, device, early_stop)
     # run full evaluation at this point?
     print(f'Decoder training finshed at epoch {results["epoch"]}, trainig loss: {results["train_loss"]}')
