@@ -15,7 +15,7 @@ import warnings
 from video_dataset import VideoFrameDataset, ImglistToTensor
 from argparse import ArgumentParser, Namespace
 
-from models import IJEPA_base, CustomDataParallel
+from models import IJEPA_base, CustomDataParallel, EarlyStop
 
 def parse_args() -> Namespace:
     parser = ArgumentParser("JEPA")
@@ -85,7 +85,7 @@ def load_validation_data(val_dir, val_annotation_file, batch_size=2):
     return dataloader
 
 # Train the model
-def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_dataloader, num_epochs, output_dir, device):
+def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_dataloader, num_epochs, output_dir, device, early_stop):
     while epoch < num_epochs:
         print(f'Starting epoch {epoch + 1}')
         start_time = time.time()
@@ -102,6 +102,9 @@ def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_d
             train_loss += loss.item()
             loss.backward()
             optimizer.step()
+
+            if i % 50 == 0 and epoch < 5:
+              print(f"Current loss: {loss.item()}") # we can just take a sample, don't need to average it
 
             # Update the learning rate using the scheduler
             if scheduler is not None:
@@ -128,7 +131,21 @@ def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_d
         current_lr = optimizer.param_groups[0]['lr']
         print(f"Epoch: {epoch + 1}, Time for training epoch {end_time - start_time}, Learning Rate: {current_lr:.6f}, Average epoch loss: {avg_epoch_loss:.4f}, Average epoch val loss: {avg_epoch_val_loss:.4f}")
 
-        # TO DO: Implement Early Stopping?? Based on what?
+        # Early Stopping
+        if avg_epoch_val_loss < early_stop.best_value:
+            torch.save(model.module.state_dict() if torch.cuda.device_count() > 1 else model.state_dict(), os.path.join(output_dir, 'models/best',"best_model.pkl"))
+            # if torch.cuda.device_count() > 1:
+            #     torch.save(model.module.state_dict(), os.path.join(output_dir, 'models/best',"best_model.pkl"))
+            # else:
+            #     torch.save(model.state_dict(), os.path.join(output_dir, 'models/best',"best_model.pkl"))
+
+        early_stop.step(avg_epoch_val_loss, epoch)
+        if early_stop.stop_training(epoch):
+            print(
+                "early stopping at epoch {} since valdiation loss didn't improve from epoch no {}. Best value {}, current value {}".format(
+                    epoch, early_stop.best_epoch, early_stop.best_value, avg_epoch_val_loss
+                ))
+            break
 
         # Used this approach (while and epoch increase) so that we can get back to training the loaded model from checkpoint
         epoch += 1
@@ -139,7 +156,7 @@ def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_d
             'model_state_dict': model.module.state_dict() if torch.cuda.device_count() > 1 else model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
             'scheduler_state_dict': scheduler.state_dict() if scheduler is not None else None,
-            #'early_stop': early_stop,
+            'early_stop': early_stop,
             }, os.path.join(output_dir, 'models/partial', "checkpoint.pkl"))
 
     return {
@@ -158,6 +175,7 @@ if __name__ == "__main__":
     div_factor = 10 # max_lr/div_factor = initial lr
     final_div_factor = 100 # final lr is initial_lr/final_div_factor 
     batch_size = 8
+    patience = 10
 
     args = parse_args()
 
@@ -167,6 +185,7 @@ if __name__ == "__main__":
     
     save_dir = os.path.join(args.output_dir,args.run_id)
     os.makedirs(os.path.join(save_dir, "models/partial"), exist_ok=True)
+    os.makedirs(os.path.join(save_dir, "models/best"), exist_ok=True)
 
     # Load unlabeled data and validation data
     unlabeled_data_dir  = os.path.join(args.root, 'data')
@@ -214,7 +233,9 @@ if __name__ == "__main__":
     # Define One Cycle LR Scheduler
     total_steps = num_epochs * len(dataloader)
     # scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=0.003, total_steps=total_steps, div_factor=div_factor, final_div_factor=final_div_factor)
-    scheduler = None
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=total_steps, eta_min=0.000001)
+    # scheduler = None
+    early_stop = EarlyStop(patience)
 
     if args.resume:
         print("Attempting to find existing checkpoint")
@@ -226,6 +247,7 @@ if __name__ == "__main__":
             if scheduler is not None:
                 scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
             epoch = checkpoint['epoch']
+            early_stop = checkpoint['early_stop']
             print(f'Resuming training from epoch {epoch}')
     
     if torch.cuda.device_count() > 1:
@@ -235,6 +257,6 @@ if __name__ == "__main__":
     model.to(device)
 
     print('Start training model...')
-    results = train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_dataloader, num_epochs, save_dir, device)
+    results = train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_dataloader, num_epochs, save_dir, device, early_stop)
     torch.save(model.module.state_dict() if torch.cuda.device_count() > 1 else model.state_dict(), os.path.join(save_dir, 'models', "final_model.pkl"))
     print(f'Model training finshed at epoch {results["epoch"]}, trainig loss: {results["train_loss"]}')
