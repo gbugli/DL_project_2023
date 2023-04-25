@@ -1,5 +1,5 @@
 einops
 matplotlib
 jupyter
+torchmetrics
 # torchviz
-# torchmetrics

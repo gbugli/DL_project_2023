@@ -1,6 +1,7 @@
 from typing import List, Optional
 
 import torch
+import torch.nn as nn
 import torch.distributed as dist
 import torchvision
 from torch import Tensor
@@ -13,7 +14,7 @@ import matplotlib.pyplot as plt
 from torchvision import datasets, transforms
 import math
 import torch.nn.functional as F
-i
+
 
 def _max_by_axis(the_list):
     # type: (List[List[int]]) -> List[int]
