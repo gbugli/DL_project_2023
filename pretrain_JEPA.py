@@ -235,7 +235,7 @@ if __name__ == "__main__":
     # scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=0.003, total_steps=total_steps, div_factor=div_factor, final_div_factor=final_div_factor)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=total_steps, eta_min=0.000001)
     # scheduler = None
-    early_stop = EarlyStop(patience)
+    early_stop = EarlyStop(patience, loss=True)
 
     if args.resume:
         print("Attempting to find existing checkpoint")

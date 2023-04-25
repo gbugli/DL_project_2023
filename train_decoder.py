@@ -13,8 +13,9 @@ import warnings
 from video_dataset import VideoFrameDataset, ImglistToTensor
 from argparse import ArgumentParser, Namespace
 
-from decoders import Decoder
-from models import IJEPA_base
+from decoders import Decoder, ATMHead
+from models import IJEPA_base, EarlyStop
+from atm_loss import ATMLoss
 
 from eval import compute_jaccard
 
@@ -23,6 +24,7 @@ def parse_args() -> Namespace:
     parser.add_argument("--train-dir", help="Name of dir with training data", required=True, type=str)
     parser.add_argument("--val-dir", help="Name of dir with validation data", required=True, type=str)
     parser.add_argument("--output-dir", required=True, type=str, help="Name of dir to save the checkpoints to")
+    parser.add_argument("--run-id", help="Name of the run", required=True, type=str)
     parser.add_argument("--resume", default=False, type=bool, help="In case training was not completed resume from last epoch")
 
     return parser.parse_args()
@@ -86,31 +88,31 @@ def load_validation_data(val_folder, annotation_file_path, batch_size=2):
 
 
 # Train the model
-def train_model(epoch, decoder, encoder, criterion, optimizer, scheduler, dataloader, validationloader, num_epochs, output_dir, device):
+def train_model(epoch, decoder, encoder, criterion, optimizer, scheduler, dataloader, validationloader, num_epochs, output_dir, device, early_stop):
     while epoch < num_epochs:
         decoder.train()
         # do we need to do encoder.eval() or something? Since we are not training it, we want to deactivate the dropouts
         train_loss = 0
         for i, data in enumerate(dataloader, 0):
             inputs, labels, target_masks = data 
-            #inputs, labels, target_masks = inputs.to(device), labels.to(device)
+            inputs, labels, target_masks = inputs.to(device), labels.to(device), target_masks.to(device)
 
             optimizer.zero_grad()
 
             ### forward pass through encoder to get the embeddings
             predicted_embeddings = encoder(inputs.transpose(1, 2))
-            print(predicted_embeddings.shape) # not sure the exact shape of this output
 
             # Reshape predicted embeddings to (b t) (h w) m
-
+            predicted_embeddings = rearrange(predicted_embeddings, 'b t n m -> (b t) n m')
+            target_masks = rearrange(target_masks, 'b t n m -> (b t) n m')
 
             ### forward pass through decoder to get the masks
-            predicted_masks = decoder(predicted_embeddings)
+            outputs = decoder(predicted_embeddings)
 
             # the target_mask tensor is of shape b f h w
 
             ### compute the loss and step
-            loss = criterion(predicted_masks, target_masks)
+            loss = criterion(outputs, target_masks, 0)
             train_loss += loss.item()
             loss.backward()
             optimizer.step()
@@ -127,17 +129,23 @@ def train_model(epoch, decoder, encoder, criterion, optimizer, scheduler, datalo
         with torch.no_grad():
             for data in validationloader:
                 inputs, labels, target_masks = data
-                #inputs, labels, target_masks = images.to(device), labels.to(device)
+                inputs, labels, target_masks = inputs.to(device), labels.to(device), target_masks.to(device)
 
                 ### compute predictions
                 predicted_embeddings = encoder(inputs.transpose(1, 2))
-                predicted_masks = decoder(predicted_embeddings) # not sure if correct shape or need to rearrange first
+
+                # Reshape predicted embeddings to (b t) (h w) m
+                predicted_embeddings = rearrange(predicted_embeddings, 'b t n m -> (b t) n m')
+                target_masks = rearrange(target_masks, 'b t n m -> (b t) n m')
+
+                ### forward pass through decoder to get the masks
+                outputs = decoder(predicted_embeddings)
 
                 # compute loss
-                val_loss += criterion(predicted_masks, target_masks)
+                val_loss += criterion(outputs, target_masks)
 
                 ## want to go from batch * frames x height x width x num_classes with logits to batch * frames x height x width with class predictions
-                _, predicted = torch.max(predicted_masks.data, 2) # 2 should be the dimension of the num_classes
+                predicted  = torch.argmax(outputs['pred_masks'], 1)
                 jaccard_scores.append(compute_jaccard(predicted, target_masks))
         
         # per-pixel accuracy on validation set
@@ -148,6 +156,18 @@ def train_model(epoch, decoder, encoder, criterion, optimizer, scheduler, datalo
         current_lr = optimizer.param_groups[0]['lr']
         print(f"Epoch: {epoch + 1}, Learning Rate: {current_lr:.6f}, Avg train loss: {avg_epoch_loss:.4f}, Avg val loss: {avg_val_loss:.4f}, Avg Jaccard: {average_jaccard:.4f}")
 
+        # Early Stopping
+        if average_jaccard > early_stop.best_value:
+            torch.save(decoder.module.state_dict() if torch.cuda.device_count() > 1 else decoder.state_dict(), os.path.join(output_dir, 'models/decoder/best',"best_model.pkl"))
+
+        early_stop.step(average_jaccard, epoch)
+        if early_stop.stop_training(epoch):
+            print(
+                "early stopping at epoch {} since valdiation loss didn't improve from epoch no {}. Best value {}, current value {}".format(
+                    epoch, early_stop.best_epoch, early_stop.best_value, average_jaccard
+                ))
+            break
+
         # Used this approach (while and epoch increase) so that we can get back to training the loaded model from checkpoint
         epoch += 1
 
@@ -157,8 +177,8 @@ def train_model(epoch, decoder, encoder, criterion, optimizer, scheduler, datalo
             'model_state_dict': decoder.module.state_dict() if torch.cuda.device_count() > 1 else decoder.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
             'scheduler_state_dict': scheduler.state_dict(),
-            #'early_stop': early_stop,
-            }, os.path.join(output_dir, 'models/partial', "checkpoint_decoder.pkl"))
+            'early_stop': early_stop,
+            }, os.path.join(output_dir, 'models/decoder', "checkpoint_decoder.pkl"))
 
     return {
         "epochs": epoch,
@@ -168,19 +188,30 @@ def train_model(epoch, decoder, encoder, criterion, optimizer, scheduler, datalo
 
 if __name__ == "__main__":
 
-    device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+    torch.cuda.empty_cache()
+    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
     args = parse_args()
 
     batch_size = 128
 
+    # Make run dir
+    if not os.path.exists(os.path.join(args.output_dir,args.run_id)):
+        os.makedirs(os.path.join(args.output_dir,args.run_id), exist_ok=True)
+    
+    save_dir = os.path.join(args.output_dir,args.run_id)
+    os.makedirs(os.path.join(save_dir, "models/decoder"), exist_ok=True)
+    os.makedirs(os.path.join(save_dir, "models/decoder/best"), exist_ok=True)
+
     # Load train data and validation data
     train_data_dir  = os.path.join(args.train_dir, 'data')
-    train_annotation_dir = os.path.join(args.root, 'annotations.txt')
+    train_annotation_dir = os.path.join(args.train_dir, 'annotations.txt')
     val_data_dir  = os.path.join(args.val_dir, 'data')
     val_annotation_dir = os.path.join(args.val_dir, 'annotations.txt')
 
+    print('Loading train data...')
     dataloader = load_data(train_data_dir, train_annotation_dir, batch_size)
+    print('Loading val data...')
     validationloader = load_validation_data(val_data_dir, val_annotation_dir, batch_size)
 
     num_epochs = 10
@@ -189,13 +220,14 @@ if __name__ == "__main__":
     # should these also come from global config?
     div_factor = 5 # max_lr/div_factor = initial lr
     final_div_factor = 10 # final lr is initial_lr/final_div_factor 
+    patience = 10
 
     # Used this approach so that we can getv back to training the loaded model from checkpoint
     epoch = 0
 
     # get these params from global config? to ensure that it always matches the trained IJEPA model
     # load encoder
-    encoder = IJEPA_base(img_size=128, patch_size=8, in_chans=3, norm_layer=nn.LayerNorm, num_frames=22, attention_type='divided_space_time', dropout=0.1, mode="train", M=4, embed_dim=384,
+    encoder = IJEPA_base(img_size=128, patch_size=8, in_chans=3, norm_layer=nn.LayerNorm, num_frames=22, attention_type='divided_space_time', dropout=0.1, mode="test", M=4, embed_dim=384,
                         # encoder parameters
                         enc_depth=18,
                         enc_num_heads=6,
@@ -219,30 +251,38 @@ if __name__ == "__main__":
                         time_drop_rate=0.1)
 
     # load decoder       
-    decoder = Decoder(input_dim=768, hidden_dim=3072, num_hidden_layers=2)
-    criterion = nn.CrossEntropyLoss() # since we will have label predictions?
+    # decoder = Decoder(input_dim=768, hidden_dim=3072, num_hidden_layers=2)
+    decoder = ATMHead(img_size=128, H=160, W=240, in_channels=768, use_stages=1)
+    criterion = ATMLoss(48, 1)
+    # criterion = nn.CrossEntropyLoss() # since we will have label predictions?
 
     # Just using same optimizer and scheduler as IJEPA, will need to change later
     # probably higher lr than IJEPA
     optimizer = torch.optim.AdamW(decoder.parameters(), lr=0.001, weight_decay=0.05)
-    scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=0.003, total_steps=total_steps, div_factor=div_factor, final_div_factor=final_div_factor)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=total_steps, eta_min=0.000001)
 
     ### load pretrained IJEPA model -> should this just load from the latest IJEPA checkpoint?
-    path_partials = os.path.join(args.output_dir, "models/partial")
-    if os.path.exists(path_partials):
-        checkpoint = torch.load(os.path.join(path_partials, "checkpoint.pkl"), map_location=device)
-        encoder.load_state_dict(checkpoint['model_state_dict'])
+    path_best = os.path.join(save_dir, "models/best")
+    if os.path.exists(path_best):
+        checkpoint = torch.load(os.path.join(path_best, "best_model.pkl"), map_location=device)
+        encoder_state_dict = checkpoint['model_state_dict']
+        encoder_state_dict['mode'] = 'test'
+        encoder.load_state_dict(encoder_state_dict)
+    encoder.to(device)
+
+    early_stop = EarlyStop(patience)
 
     if args.resume:
         print("Attempting to find existing checkpoint")
-        path_partials = os.path.join(args.output_dir, "models/partial")
+        path_partials = os.path.join(save_dir, "models/decoder")
         if os.path.exists(path_partials):
             checkpoint = torch.load(os.path.join(path_partials, "checkpoint_decoder.pkl"), map_location=device)
             decoder.load_state_dict(checkpoint['model_state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+            early_stop = checkpoint['early_stop']
             epoch = checkpoint['epoch']
 
-    results = train_model(epoch, decoder, encoder, criterion, optimizer, scheduler, dataloader, num_epochs, args.output_dir, device)
+    results = train_model(epoch, decoder, encoder, criterion, optimizer, scheduler, dataloader, num_epochs, save_dir, device, early_stop)
     # run full evaluation at this point?
     print(f'Decoder training finshed at epoch {results["epoch"]}, trainig loss: {results["train_loss"]}')
