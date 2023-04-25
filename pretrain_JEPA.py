@@ -259,4 +259,4 @@ if __name__ == "__main__":
     print('Start training model...')
     results = train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_dataloader, num_epochs, save_dir, device, early_stop)
     torch.save(model.module.state_dict() if torch.cuda.device_count() > 1 else model.state_dict(), os.path.join(save_dir, 'models', "final_model.pkl"))
-    print(f'Model training finshed at epoch {results["epoch"]}, trainig loss: {results["train_loss"]}')
+    print(f'Model training finshed at epoch {results["epochs"]}, trainig loss: {results["train_loss"]}')
