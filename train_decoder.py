@@ -54,7 +54,7 @@ def load_data(root, annotation_file, batch_size=2):
             dataset=dataset,
             batch_size=batch_size,
             shuffle=True,
-            num_workers=1,
+            num_workers=4,  # arbitrarily chosen
             pin_memory=True
         )
     return dataloader
