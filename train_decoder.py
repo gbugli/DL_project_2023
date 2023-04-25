@@ -134,6 +134,8 @@ def train_model(epoch, decoder, encoder, criterion, optimizer, scheduler, datalo
                 inputs, labels, target_masks = data
                 inputs, labels, target_masks = inputs.to(device), labels.to(device), target_masks.to(device)
 
+                inputs = inputs[:, :11]
+
                 ### compute predictions
                 predicted_embeddings = encoder(inputs.transpose(1, 2))
 
@@ -145,11 +147,11 @@ def train_model(epoch, decoder, encoder, criterion, optimizer, scheduler, datalo
                 outputs = decoder(predicted_embeddings)
 
                 # compute loss
-                val_loss += criterion(outputs, target_masks)
+                val_loss +=  criterion(outputs, target_masks, 0)
 
                 ## want to go from batch * frames x height x width x num_classes with logits to batch * frames x height x width with class predictions
                 predicted  = torch.argmax(outputs['pred_masks'], 1)
-                jaccard_scores.append(compute_jaccard(predicted, target_masks))
+                jaccard_scores.append(compute_jaccard(predicted, target_masks, device))
         
         # per-pixel accuracy on validation set
         # is this a good metric? Probably not
@@ -299,6 +301,11 @@ if __name__ == "__main__":
             scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
             early_stop = checkpoint['early_stop']
             epoch = checkpoint['epoch']
+    
+    # if torch.cuda.device_count() > 1:
+    #     print("Model training will be distributed to {} GPUs.".format(torch.cuda.device_count()))
+    #     decoder = nn.DataParallel(decoder)
+    # decoder.to(device)
 
     results = train_model(epoch, decoder, encoder, criterion, optimizer, scheduler, dataloader, validationloader, num_epochs, save_dir, device, early_stop)
     # run full evaluation at this point?

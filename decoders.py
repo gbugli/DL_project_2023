@@ -380,8 +380,8 @@ class ATMHead(nn.Module):
             out["aux_outputs"] = self._set_aux_loss(
                 outputs_class, outputs_seg_masks
             )
-        else:
-            return out["pred"]
+        # else:
+        #     return out["pred"]
 
         return out
 

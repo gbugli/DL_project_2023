@@ -14,8 +14,8 @@ import torchmetrics
 # the final metric is what we want to optimize, since we get graded on it, but the other ones will provide good insights
 
 # this method works for any matching number of frames
-def compute_jaccard(ground_truth_mask, predicted_mask):
-  jaccard = torchmetrics.JaccardIndex(task="multiclass", num_classes=49)
+def compute_jaccard(ground_truth_mask, predicted_mask, device):
+  jaccard = torchmetrics.JaccardIndex(task="multiclass", num_classes=49).to(device)
   jaccard(torch.Tensor(ground_truth_mask), torch.Tensor(predicted_mask))
 
 def evaluate_model(encoder, decoder, validationloader):
