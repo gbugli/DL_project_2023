@@ -87,7 +87,7 @@ def train_model(epoch, decoder, encoder, criterion, optimizer, scheduler, datalo
             # the target_mask tensor is of shape b f h w
 
             ### compute the loss and step
-            loss = criterion(outputs, target_masks, 0)
+            loss = criterion(outputs, target_masks, -1)
             train_loss += loss.item()
             loss.backward()
             optimizer.step()
@@ -119,7 +119,7 @@ def train_model(epoch, decoder, encoder, criterion, optimizer, scheduler, datalo
                 outputs = decoder(predicted_embeddings)
 
                 # compute loss
-                val_loss +=  criterion(outputs, target_masks, 0)
+                val_loss +=  criterion(outputs, target_masks, -1)
 
                 ## want to go from batch * frames x height x width x num_classes with logits to batch * frames x height x width with class predictions
                 predicted  = torch.argmax(outputs['pred_masks'], 1)
