@@ -104,7 +104,8 @@ def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_d
             optimizer.step()
 
             # Update the learning rate using the scheduler
-            scheduler.step()
+            if scheduler is not None:
+                scheduler.step()
         
         avg_epoch_loss = train_loss / len(dataloader)
         end_time = time.time()
@@ -137,7 +138,7 @@ def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_d
             'epoch': epoch,
             'model_state_dict': model.module.state_dict() if torch.cuda.device_count() > 1 else model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
-            'scheduler_state_dict': scheduler.state_dict(),
+            'scheduler_state_dict': scheduler.state_dict() if scheduler is not None else None,
             #'early_stop': early_stop,
             }, os.path.join(output_dir, 'models/partial', "checkpoint.pkl"))
 
@@ -208,11 +209,12 @@ if __name__ == "__main__":
     model.to(device)
 
     criterion = nn.MSELoss()
-    optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=0.0005)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=0.0001, weight_decay=0.005)
 
     # Define One Cycle LR Scheduler
     total_steps = num_epochs * len(dataloader)
-    scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=0.003, total_steps=total_steps, div_factor=div_factor, final_div_factor=final_div_factor)
+    # scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=0.003, total_steps=total_steps, div_factor=div_factor, final_div_factor=final_div_factor)
+    scheduler = None
 
     if args.resume:
         print("Attempting to find existing checkpoint")
@@ -221,7 +223,8 @@ if __name__ == "__main__":
             checkpoint = torch.load(os.path.join(path_partials, "checkpoint.pkl"), map_location=device)
             model.load_state_dict(checkpoint['model_state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-            scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+            if scheduler is not None:
+                scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
             epoch = checkpoint['epoch']
             print(f'Resuming training from epoch {epoch}')
     
@@ -233,4 +236,5 @@ if __name__ == "__main__":
 
     print('Start training model...')
     results = train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_dataloader, num_epochs, save_dir, device)
+    torch.save(model.module.state_dict() if torch.cuda.device_count() > 1 else model.state_dict(), os.path.join(save_dir, 'models', "final_model.pkl"))
     print(f'Model training finshed at epoch {results["epoch"]}, trainig loss: {results["train_loss"]}')
