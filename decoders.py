@@ -20,6 +20,51 @@ import math
 from functools import partial
 from models import trunc_normal_
 
+
+class DecoderSimple(nn.Module):
+    def __init__(self, embed_dim, num_classes, num_patches, h, w):
+        super().__init__()
+
+        self.patches_h = int(np.sqrt(num_patches))
+        self.num_classes = num_classes
+        self.h = h
+        self.w = w
+
+        self.deconv1 = nn.ConvTranspose2d(embed_dim, 256, kernel_size=4, stride=2, padding=1, output_padding=0)
+        self.bn1 = nn.BatchNorm2d(256)
+
+        self.deconv2 = nn.ConvTranspose2d(256, 128, kernel_size=4, stride=2, padding=1, output_padding=0)
+        self.bn2 = nn.BatchNorm2d(128)
+
+        self.deconv3 = nn.ConvTranspose2d(128, 64, kernel_size=4, stride=2, padding=1, output_padding=0)
+        self.bn3 = nn.BatchNorm2d(64)
+
+        self.deconv4 = nn.ConvTranspose2d(64, num_classes, kernel_size=4, stride=2, padding=1, output_padding=0)
+
+    def forward(self, x):
+        b= x.shape[0]
+        x = rearrange(x, 'b (n m) e -> b e n m', n=self.patches_h)
+
+        x = self.deconv1(x)
+        x = self.bn1(x)
+        x = nn.ReLU()(x)
+
+        x = self.deconv2(x)
+        x = self.bn2(x)
+        x = nn.ReLU()(x)
+
+        x = self.deconv3(x)
+        x = self.bn3(x)
+        x = nn.ReLU()(x)
+
+        x = self.deconv4(x)
+
+        size = (self.h, self.w)
+        x = F.interpolate(x, size=size, mode='bilinear', align_corners=False)
+
+        return x
+    
+
 def trunc_normal_init(module: nn.Module,
                       mean: float = 0,
                       std: float = 1,
