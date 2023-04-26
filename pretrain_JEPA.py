@@ -57,7 +57,10 @@ def load_data(root, annotation_file, batch_size=2):
     return dataloader
 
 # Train the model
-def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_dataloader, num_epochs, output_dir, device, early_stop):
+def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_dataloader, num_epochs, output_dir, device, early_stop, m=0.996, m_start_end=(.996, 1.)):
+
+    estimated_stepping_batches = len(dataloader) * num_epochs
+
     while epoch < num_epochs:
         print(f'Starting epoch {epoch + 1}')
         start_time = time.time()
@@ -73,6 +76,14 @@ def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_d
             loss = criterion(prediction_blocks, target_blocks)
             train_loss += loss.item()
             loss.backward()
+
+            student_model = model.student_encoder.eval()
+            teacher_model = model.teacher_encoder.eval()
+            with torch.no_grad():
+                for student_param, teacher_param in zip(student_model.parameters(), teacher_model.parameters()):
+                    teacher_param.data.mul_(m).add_(1 - m, student_param.data)
+            m += (m_start_end[1] - m_start_end[0]) / estimated_stepping_batches
+
             optimizer.step()
 
             if i % 50 == 0 and epoch < 5:
@@ -146,7 +157,7 @@ if __name__ == "__main__":
     num_epochs = 100
     div_factor = 10 # max_lr/div_factor = initial lr
     final_div_factor = 100 # final lr is initial_lr/final_div_factor 
-    batch_size = 8
+    batch_size = 2
     patience = 10
 
     args = parse_args()
