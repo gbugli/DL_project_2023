@@ -94,56 +94,60 @@ def train_model(epoch, decoder, encoder, criterion, optimizer, scheduler, datalo
 
             # Update the scheduler learning rate
             scheduler.step()
+
+            if i % 50 == 0 and epoch < 5:
+              print(f"Current loss: {loss.item()}")
         
         avg_epoch_loss = train_loss / len(dataloader)
 
-        # Validation loss
-        decoder.eval()
-        val_loss = 0
-        jaccard_scores = []
-        with torch.no_grad():
-            for data in validationloader:
-                inputs, labels, target_masks = data
-                inputs, labels, target_masks = inputs.to(device), labels.to(device), target_masks.to(device)
+        # # Validation loss
+        # decoder.eval()
+        # val_loss = 0
+        # jaccard_scores = []
+        # with torch.no_grad():
+        #     for data in validationloader:
+        #         inputs, labels, target_masks = data
+        #         inputs, labels, target_masks = inputs.to(device), labels.to(device), target_masks.to(device)
 
-                inputs = inputs[:, :11]
+        #         inputs = inputs[:, :11]
 
-                ### compute predictions
-                predicted_embeddings = encoder(inputs.transpose(1, 2))
+        #         ### compute predictions
+        #         predicted_embeddings = encoder(inputs.transpose(1, 2))
 
-                # Reshape predicted embeddings to (b t) (h w) m
-                predicted_embeddings = rearrange(predicted_embeddings, 'b t n m -> (b t) n m')
-                target_masks = rearrange(target_masks, 'b t n m -> (b t) n m')
+        #         # Reshape predicted embeddings to (b t) (h w) m
+        #         predicted_embeddings = rearrange(predicted_embeddings, 'b t n m -> (b t) n m')
+        #         target_masks = rearrange(target_masks, 'b t n m -> (b t) n m')
 
-                ### forward pass through decoder to get the masks
-                outputs = decoder(predicted_embeddings)
+        #         ### forward pass through decoder to get the masks
+        #         outputs = decoder(predicted_embeddings)
 
-                # compute loss
-                val_loss +=  criterion(outputs, target_masks, -1)
+        #         # compute loss
+        #         val_loss +=  criterion(outputs, target_masks, -1)
 
-                ## want to go from batch * frames x height x width x num_classes with logits to batch * frames x height x width with class predictions
-                predicted  = torch.argmax(outputs['pred_masks'], 1)
-                jaccard_scores.append(compute_jaccard(predicted, target_masks, device))
+        #         ## want to go from batch * frames x height x width x num_classes with logits to batch * frames x height x width with class predictions
+        #         predicted  = torch.argmax(outputs['pred_masks'], 1)
+        #         jaccard_scores.append(compute_jaccard(predicted, target_masks, device))
         
-        # per-pixel accuracy on validation set
-        # is this a good metric? Probably not
-        avg_val_loss = val_loss / len(validationloader)
-        average_jaccard = sum(jaccard_scores) / len(jaccard_scores)
+        # # per-pixel accuracy on validation set
+        # # is this a good metric? Probably not
+        # avg_val_loss = val_loss / len(validationloader)
+        # average_jaccard = sum(jaccard_scores) / len(jaccard_scores)
 
         current_lr = optimizer.param_groups[0]['lr']
-        print(f"Epoch: {epoch + 1}, Learning Rate: {current_lr:.6f}, Avg train loss: {avg_epoch_loss:.4f}, Avg val loss: {avg_val_loss:.4f}, Avg Jaccard: {average_jaccard:.4f}")
+        # print(f"Epoch: {epoch + 1}, Learning Rate: {current_lr:.6f}, Avg train loss: {avg_epoch_loss:.4f}, Avg val loss: {avg_val_loss:.4f}, Avg Jaccard: {average_jaccard:.4f}")
+        print(f"Epoch: {epoch + 1}, Learning Rate: {current_lr:.6f}, Avg train loss: {avg_epoch_loss:.4f}")
 
-        # Early Stopping
-        if average_jaccard > early_stop.best_value:
-            torch.save(decoder.module.state_dict() if torch.cuda.device_count() > 1 else decoder.state_dict(), os.path.join(output_dir, 'models/decoder/best',"best_model.pkl"))
+        # # Early Stopping
+        # if average_jaccard > early_stop.best_value:
+        #     torch.save(decoder.module.state_dict() if torch.cuda.device_count() > 1 else decoder.state_dict(), os.path.join(output_dir, 'models/decoder/best',"best_model.pkl"))
 
-        early_stop.step(average_jaccard, epoch)
-        if early_stop.stop_training(epoch):
-            print(
-                "early stopping at epoch {} since valdiation loss didn't improve from epoch no {}. Best value {}, current value {}".format(
-                    epoch, early_stop.best_epoch, early_stop.best_value, average_jaccard
-                ))
-            break
+        # early_stop.step(average_jaccard, epoch)
+        # if early_stop.stop_training(epoch):
+        #     print(
+        #         "early stopping at epoch {} since valdiation loss didn't improve from epoch no {}. Best value {}, current value {}".format(
+        #             epoch, early_stop.best_epoch, early_stop.best_value, average_jaccard
+        #         ))
+        #     break
 
         # Used this approach (while and epoch increase) so that we can get back to training the loaded model from checkpoint
         epoch += 1
@@ -191,7 +195,7 @@ if __name__ == "__main__":
     print('Loading val data...')
     validationloader = load_data(val_data_dir, val_annotation_dir, batch_size)
 
-    num_epochs = 10
+    num_epochs = 100
     total_steps = num_epochs * len(dataloader)
 
     # should these also come from global config?
@@ -281,4 +285,4 @@ if __name__ == "__main__":
 
     results = train_model(epoch, decoder, encoder, criterion, optimizer, scheduler, dataloader, validationloader, num_epochs, save_dir, device, early_stop)
     # run full evaluation at this point?
-    print(f'Decoder training finshed at epoch {results["epoch"]}, trainig loss: {results["train_loss"]}')
+    print(f'Decoder training finshed at epoch {results["epochs"]}, trainig loss: {results["train_loss"]}')

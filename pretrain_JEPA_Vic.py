@@ -56,11 +56,17 @@ def load_data(root, annotation_file, batch_size=2):
         )
     return dataloader
 
+def off_diagonal(x):
+    n, m = x.shape
+    assert n == m
+    return x.flatten()[:-1].view(n - 1, n + 1)[:, 1:].flatten()
+
 # Train the model
-def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_dataloader, num_epochs, output_dir, device, early_stop, m=0.996, m_start_end=(.996, 1.)):
+def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_dataloader, num_epochs, output_dir, device, early_stop, m=0.996, m_start_end=(.996, 1.), loss_coeffs=[25.0, 25.0, 1.0]):
 
     estimated_stepping_batches = len(dataloader) * num_epochs
 
+    scaler = torch.cuda.amp.GradScaler()
     while epoch < num_epochs:
         print(f'Starting epoch {epoch + 1}')
         start_time = time.time()
@@ -73,9 +79,34 @@ def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_d
             optimizer.zero_grad()
 
             prediction_blocks, target_blocks = model(inputs.transpose(1, 2))
-            loss = criterion(prediction_blocks, target_blocks)
-            train_loss += loss.item()
-            loss.backward()
+            
+            ###VicRegLoss
+            repr_loss = criterion(prediction_blocks, target_blocks)
+
+            prediction_blocks = prediction_blocks - prediction_blocks.mean(dim=0)
+            target_blocks = target_blocks - target_blocks.mean(dim=0)
+
+            std_prediction_blocks = torch.sqrt(prediction_blocks.var(dim=0) + 0.0001)
+            std_target_blocks = torch.sqrt(target_blocks.var(dim=0) + 0.0001)
+            std_loss = torch.mean(F.relu(1 - std_prediction_blocks)) / 2 + torch.mean(F.relu(1 - std_target_blocks)) / 2
+
+            cov_prediction_blocks = (prediction_blocks.T @ prediction_blocks) / (prediction_blocks.shape[0]- 1)
+            cov_target_blocks = (target_blocks.T @ target_blocks) / (target_blocks.shape[0] - 1)
+            cov_loss = off_diagonal(cov_prediction_blocks).pow_(2).sum().div(
+                model.sizes[-1]
+            ) + off_diagonal(cov_target_blocks).pow_(2).sum().div(model.sizes[-1])
+
+            loss = (
+                loss_coeffs[0] * repr_loss
+                + loss_coeffs[1] * std_loss
+                + loss_coeffs[2] * cov_loss
+            )
+            ###
+            # loss = criterion(prediction_blocks, target_blocks)
+            # train_loss += loss.item()
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
 
             student_model = model.student_encoder.eval()
             teacher_model = model.teacher_encoder.eval()
@@ -185,7 +216,7 @@ if __name__ == "__main__":
     epoch = 0
 
     # get these params from a global config?
-    model = IJEPA_base(img_size=128, patch_size=8, in_chans=3, norm_layer=nn.LayerNorm, num_frames=22, attention_type='divided_space_time', dropout=0.1, mode="train", M=4, embed_dim=384, device=device,
+    model = IJEPA_Vic(img_size=128, patch_size=8, in_chans=3, norm_layer=nn.LayerNorm, num_frames=22, attention_type='divided_space_time', dropout=0.1, mode="train", M=4, embed_dim=384, device=device, sizes = [512, 1024, 512],
                         # encoder parameters
                         enc_depth=10,
                         enc_num_heads=6,
