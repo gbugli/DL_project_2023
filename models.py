@@ -524,7 +524,7 @@ class IJEPA_base(nn.Module):
         prediction_blocks = self.predictor(prediction_cat,B, T, W)
 
         prediction_blocks = prediction_blocks[:,-p:]
-        return prediction_blocks, target_blocks
+        return prediction_blocks, target_blocks, context_encoding
 
 
 
