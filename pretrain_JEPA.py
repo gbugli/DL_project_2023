@@ -2,6 +2,7 @@ import os
 import gc
 import torch
 import torch.nn as nn
+import torch.nn.utils as utils
 from einops import rearrange
 import time
 # import imageio.v3 as iio
@@ -108,6 +109,9 @@ def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_d
             loss = criterion(prediction_blocks, target_blocks)
             train_loss += loss.item()
             loss.backward()
+
+            # Implementing the gradient clipping
+            utils.clip_grad_norm_(model.parameters(), 1.0)
 
             optimizer.step()
 
