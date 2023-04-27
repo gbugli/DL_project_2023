@@ -110,14 +110,14 @@ def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_d
             scaler.step(optimizer)
             scaler.update()
 
+            optimizer.step()
+
             student_model = model.module.student_encoder.eval()
             teacher_model = model.module.teacher_encoder.eval()
             with torch.no_grad():
                 for student_param, teacher_param in zip(student_model.parameters(), teacher_model.parameters()):
                     teacher_param.data.mul_(m).add_(1 - m, student_param.data)
             m += (m_start_end[1] - m_start_end[0]) / estimated_stepping_batches
-
-            optimizer.step()
 
             if i % 50 == 0 and epoch < 5:
               print(f"Current loss: {loss.item()}") # we can just take a sample, don't need to average it
@@ -190,7 +190,7 @@ if __name__ == "__main__":
     num_epochs = 100
     div_factor = 10 # max_lr/div_factor = initial lr
     final_div_factor = 100 # final lr is initial_lr/final_div_factor 
-    batch_size = 8
+    batch_size = 12
     patience = 10
 
     args = parse_args()
@@ -218,9 +218,9 @@ if __name__ == "__main__":
     epoch = 0
 
     # get these params from a global config?
-    model = IJEPA_Vic(img_size=128, patch_size=8, in_chans=3, norm_layer=nn.LayerNorm, num_frames=22, attention_type='divided_space_time', dropout=0.1, mode="train", M=4, embed_dim=384, device=device, sizes = [512, 1024, 512],
+    model = IJEPA_Vic(img_size=128, patch_size=8, in_chans=3, norm_layer=nn.LayerNorm, num_frames=22, attention_type='divided_space_time', dropout=0.1, mode="train", M=6, embed_dim=768, device=device, sizes = [1024, 2048, 1024],
                         # encoder parameters
-                        enc_depth=10,
+                        enc_depth=4,
                         enc_num_heads=6,
                         enc_mlp_ratio=4.,
                         enc_qkv_bias=False,
@@ -229,7 +229,7 @@ if __name__ == "__main__":
                         enc_attn_drop_rate=0.,
                         enc_drop_path_rate=0.1,
                         # predictor parameters
-                        pred_depth=10,
+                        pred_depth=4,
                         pred_num_heads=6,
                         pred_mlp_ratio=4.,
                         pred_qkv_bias=False,
@@ -273,6 +273,6 @@ if __name__ == "__main__":
     model.to(device)
 
     print('Start training model...')
-    results = train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_dataloader, num_epochs, save_dir, device, early_stop)
+    results = train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_dataloader, num_epochs, save_dir, device, early_stop, m=0.95, m_start_end=(0.95, 1))
     torch.save(model.module.state_dict() if torch.cuda.device_count() > 1 else model.state_dict(), os.path.join(save_dir, 'models', "final_model.pkl"))
     print(f'Model training finshed at epoch {results["epochs"]}, trainig loss: {results["train_loss"]}')
