@@ -96,7 +96,7 @@ def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_d
                     teacher_param.data.mul_(m).add_(1 - m, student_param.data)
             m += (m_start_end[1] - m_start_end[0]) / estimated_stepping_batches
 
-            if i % 20 == 0 and epoch < 5:
+            if i % 20 == 0 and epoch < 20:
               context_cos_sim, sense_check = mean_cosine_similarity(context_embeddings)
               target_cos_sim, sense_check = mean_cosine_similarity(target_blocks)
               print(f"Current loss: {loss.item()}, Context cos_sim: {context_cos_sim}, Target cos_sim: {target_cos_sim}, Sense check: {sense_check}")
@@ -224,12 +224,12 @@ if __name__ == "__main__":
     model.to(device)
 
     criterion = nn.MSELoss()
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-7, weight_decay=0.005)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-5, weight_decay=0.005)
 
     # Define One Cycle LR Scheduler
     total_steps = num_epochs * len(dataloader)
     # scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=0.003, total_steps=total_steps, div_factor=div_factor, final_div_factor=final_div_factor)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=total_steps, eta_min=1e-9)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=total_steps, eta_min=1e-8)
     # scheduler = None
     early_stop = EarlyStop(patience, loss=True)
 
@@ -253,6 +253,6 @@ if __name__ == "__main__":
     model.to(device)
 
     print('Start training model...')
-    results = train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_dataloader, num_epochs, save_dir, device, early_stop, m=0.9995, m_start_end=(0.9995, 1))
+    results = train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_dataloader, num_epochs, save_dir, device, early_stop, m=0.995, m_start_end=(0.9995, 1))
     torch.save(model.module.state_dict() if torch.cuda.device_count() > 1 else model.state_dict(), os.path.join(save_dir, 'models', "final_model.pkl"))
     print(f'Model training finshed at epoch {results["epochs"]}, trainig loss: {results["train_loss"]}')
