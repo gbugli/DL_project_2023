@@ -151,13 +151,14 @@ def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_d
 if __name__ == "__main__":
 
     torch.cuda.empty_cache()
+    gc.collect()
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
     # All these hyperparamters we might want to have a config file to choose them and use a custom Config class to parse
     num_epochs = 100
     div_factor = 10 # max_lr/div_factor = initial lr
     final_div_factor = 100 # final lr is initial_lr/final_div_factor 
-    batch_size = 12
+    batch_size = 8
     patience = 50
 
     args = parse_args()
@@ -185,7 +186,7 @@ if __name__ == "__main__":
     epoch = 0
 
     # get these params from a global config?
-    model = IJEPA_base(img_size=128, patch_size=8, in_chans=3, norm_layer=nn.LayerNorm, num_frames=22, attention_type='joint_space_time', dropout=0.1, mode="train", r=0.5, embed_dim=768, device=device,
+    model = IJEPA_base(img_size=128, patch_size=16, in_chans=3, norm_layer=nn.LayerNorm, num_frames=22, attention_type='joint_space_time', dropout=0.1, mode="train", r=0.5, embed_dim=768, device=device,
                         # encoder parameters
                         enc_depth=4,
                         enc_num_heads=6,
@@ -211,12 +212,12 @@ if __name__ == "__main__":
     model.to(device)
 
     criterion = nn.MSELoss()
-    optimizer = torch.optim.AdamW(model.parameters(), lr=0.0001, weight_decay=0.005)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-7, weight_decay=0.005)
 
     # Define One Cycle LR Scheduler
     total_steps = num_epochs * len(dataloader)
     # scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=0.003, total_steps=total_steps, div_factor=div_factor, final_div_factor=final_div_factor)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=total_steps, eta_min=0.000001)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=total_steps, eta_min=1e-9)
     # scheduler = None
     early_stop = EarlyStop(patience, loss=True)
 
@@ -240,6 +241,6 @@ if __name__ == "__main__":
     model.to(device)
 
     print('Start training model...')
-    results = train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_dataloader, num_epochs, save_dir, device, early_stop, m=0.95, m_start_end=(0.95, 1))
+    results = train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_dataloader, num_epochs, save_dir, device, early_stop, m=0.9995, m_start_end=(0.9995, 1))
     torch.save(model.module.state_dict() if torch.cuda.device_count() > 1 else model.state_dict(), os.path.join(save_dir, 'models', "final_model.pkl"))
     print(f'Model training finshed at epoch {results["epochs"]}, trainig loss: {results["train_loss"]}')

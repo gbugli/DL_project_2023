@@ -502,7 +502,7 @@ class IJEPA_base(nn.Module):
         #get context embeddings
         context_block = self.get_context_block(x, mask_indices)
 
-        context_encoding = self.student_encoder(context_block, B, T-self.M, W)
+        context_encoding = self.student_encoder(context_block, B, T, W)
         context_encoding = self.norm(context_encoding)
         # context_encoding = rearrange(context_encoding, 'b t (h w) m -> b (t h w) m',b=B,t=T-self.M,w=W)
 
