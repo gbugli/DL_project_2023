@@ -133,3 +133,5 @@ dmypy.json
 *.ext3
 
 output/
+
+classify_image_graph_def.pb
