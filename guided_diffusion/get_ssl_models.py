@@ -36,7 +36,7 @@ class Wrapper_IJEPA(nn.Module):
         self.pooling = torch.nn.AdaptiveAvgPool2d((1, 1))
 
     def forward(self, x):
-        data, target, mask = x
+        data, mask, label = x
         out = self.model(data)
         out = rearrange(out, 'b (t n) m -> (b t) n m', t=22)
         if out.ndim > 2:

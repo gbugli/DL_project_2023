@@ -230,6 +230,7 @@ class VideoFrameDataset(torch.utils.data.Dataset):
 
         frame_start_indices = frame_start_indices + record.start_frame
         images = list()
+        label = {}
 
         # from each start_index, load self.frames_per_segment
         # consecutive frames
@@ -249,9 +250,9 @@ class VideoFrameDataset(torch.utils.data.Dataset):
 
         if self.mask:
             mask = self._load_mask(record.path)
-            return images, record.label, mask
+            return images, mask, label
 
-        return images, record.label
+        return images, label
 
     def __len__(self):
         return len(self.video_list)

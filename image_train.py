@@ -92,12 +92,12 @@ def load_ssl_data(args, ssl_model=None):
 
 def create_argparser():
     defaults = dict(
-        data_dir="",
+        data_dir="/train",
         schedule_sampler="uniform",
         lr=1e-4,
         weight_decay=0.0,
         lr_anneal_steps=0,
-        batch_size=1,
+        batch_size=4,
         microbatch=-1,  # -1 disables microbatches
         ema_rate="0.9999",  # comma-separated list of EMA values
         log_interval=10,
@@ -111,14 +111,14 @@ def create_argparser():
     )
     defaults.update(model_and_diffusion_defaults())
     parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument('--out_dir', default=".", type=str, help='Path to save logs and checkpoints.')
+    parser.add_argument('--out_dir', default="output/test_5", type=str, help='Path to save logs and checkpoints.')
     parser.add_argument('--feat_cond', action='store_true', default=False,
                         help='Activate conditional RCDM.')
     parser.add_argument('--use_head', action='store_true', default=False,
                         help='This flag enables squeeze and excitation.')
     parser.add_argument('--no_shared', action='store_false', default=True,
                         help='Disable the shared lower dimensional projection of the representation.')
-    parser.add_argument('--type_model', type=str, default="dino",
+    parser.add_argument('--type_model', type=str, default="jepa",
                     help='Select the type of model to use.')
     add_dict_to_argparser(parser, defaults)
     return parser
