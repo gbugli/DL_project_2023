@@ -56,6 +56,16 @@ def load_data(root, annotation_file, batch_size=2):
         )
     return dataloader
 
+
+def mean_cosine_similarity(embeddings):
+  first_patch_embeddings = embeddings[:, 0, :]
+  cosine_sim_matrix = F.cosine_similarity(first_patch_embeddings.unsqueeze(1), first_patch_embeddings.unsqueeze(0), dim=2)
+  # remove diagonal since it will always be 1
+  mean = (cosine_sim_matrix.sum() - cosine_sim_matrix.trace()) / (cosine_sim_matrix.numel() - cosine_sim_matrix.size(0))
+  sense_check = cosine_sim_matrix.trace()/cosine_sim_matrix.size(0) # should be 1
+  return mean, sense_check
+
+
 # Train the model
 def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_dataloader, num_epochs, output_dir, device, early_stop, m=0.996, m_start_end=(.996, 1.)):
 
@@ -72,7 +82,7 @@ def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_d
 
             optimizer.zero_grad()
 
-            prediction_blocks, target_blocks = model(inputs.transpose(1, 2))
+            prediction_blocks, target_blocks, context_embeddings = model(inputs.transpose(1, 2))
             loss = criterion(prediction_blocks, target_blocks)
             train_loss += loss.item()
             loss.backward()
@@ -87,7 +97,9 @@ def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_d
             m += (m_start_end[1] - m_start_end[0]) / estimated_stepping_batches
 
             if i % 20 == 0 and epoch < 5:
-              print(f"Current loss: {loss.item()}") # we can just take a sample, don't need to average it
+              context_cos_sim, sense_check = mean_cosine_similarity(context_embeddings)
+              target_cos_sim, sense_check = mean_cosine_similarity(target_blocks)
+              print(f"Current loss: {loss.item()}, Context cos_sim: {context_cos_sim}, Target cos_sim: {target_cos_sim}, Sense check: {sense_check}")
 
             # Update the learning rate using the scheduler
             if scheduler is not None:
