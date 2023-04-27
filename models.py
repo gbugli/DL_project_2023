@@ -489,7 +489,7 @@ class IJEPA_base(nn.Module):
 
             target_embeddings = target_pos_embedding + target_time_embed
             target_embeddings = rearrange(target_embeddings, 'b t n m -> b (t n) m')
-            target_masks = target_masks + target_time_embed
+            target_masks = target_masks + target_embeddings
             
             # target_masks = rearrange(target_masks, 'b t (h w) m -> b (t h w) m',b=B,t=11,w=W)
             encoding = torch.cat((encoding, target_masks), dim=1)
