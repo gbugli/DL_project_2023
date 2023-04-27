@@ -66,6 +66,28 @@ def mean_cosine_similarity(embeddings):
   return mean, sense_check
 
 
+def compute_rank(prediction_blocks, threshold=0.95):
+  embeddings = prediction_blocks.reshape(-1, prediction_blocks.size(-1))
+
+  sample_mean = torch.mean(embeddings, dim=0, keepdim=True)
+
+  covariance = torch.matmul((embeddings - sample_mean).T, embeddings - sample_mean) / embeddings.size(0)
+  eigenvalues, _ = torch.linalg.eigh(covariance)
+
+  total_variance = torch.sum(eigenvalues)
+
+  explained_variance_ratio = eigenvalues / total_variance
+  cumulative_explained_variance_ratio = torch.cumsum(explained_variance_ratio, dim=0)
+
+  return torch.sum(cumulative_explained_variance_ratio < threshold) + 1
+
+def compute_rank_per_frame(prediction_blocks, threshold=0.95):
+  frame_ranks = torch.zeros(prediction_blocks.size(1), dtype=torch.int64)
+  for i in range(prediction_blocks.size(1)):
+    frame_ranks[i] = compute_rank(prediction_blocks[:, i, :, :], threshold)
+  
+  return frame_ranks
+
 # Train the model
 def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_dataloader, num_epochs, output_dir, device, early_stop, m=0.996, m_start_end=(.996, 1.)):
 
@@ -99,7 +121,10 @@ def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_d
             if i % 20 == 0 and epoch < 20:
               context_cos_sim, sense_check = mean_cosine_similarity(context_embeddings)
               target_cos_sim, sense_check = mean_cosine_similarity(target_blocks)
-              print(f"Current loss: {loss.item()}, Context cos_sim: {context_cos_sim}, Target cos_sim: {target_cos_sim}, Sense check: {sense_check}")
+              pred_cos_sim, sense_check = mean_cosine_similarity(prediction_blocks)
+              print(f"Current loss: {loss.item()}")
+              print(f"Overall pred rank: {compute_rank(prediction_blocks)}, Context rank per frame: {compute_rank_per_frame(context_embeddings)}")
+              print(f"Context cos_sim: {context_cos_sim}, Target cos_sim: {target_cos_sim}, Pred cos_sim: {pred_cos_sim}, Sense check: {sense_check}")
 
             # Update the learning rate using the scheduler
             if scheduler is not None:
