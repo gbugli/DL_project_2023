@@ -521,6 +521,15 @@ class IJEPA_base(nn.Module):
         prediction_blocks = prediction_blocks[:,-4:]
         return prediction_blocks, target_blocks
 
+def Projector(embed_dim, sizes, num_frames):
+        sizes = [embed_dim] + sizes
+        layers = []
+        for i in range(len(sizes) - 1):
+            layers.append(nn.Linear(sizes[i], sizes[i + 1]))
+            layers.append(nn.BatchNorm2d(num_frames))
+            layers.append(nn.ReLU(True))
+        layers.append(nn.Linear(sizes[-1], embed_dim, bias=False))
+        return nn.Sequential(*layers)
 
 class IJEPA_Vic(nn.Module):
     def __init__(self,
@@ -564,9 +573,11 @@ class IJEPA_Vic(nn.Module):
         nn.init.trunc_normal_(self.mask_token, 0.02)
         self.M = M # number of masked frames
 
+        self.embed_dim = embed_dim
         self.sizes = sizes
         self.norm_layer = norm_layer
         self.norm = norm_layer(embed_dim)
+        # self.norm_proj = norm_layer(sizes[-1])
 
         self.attention_type = attention_type
 
@@ -611,18 +622,8 @@ class IJEPA_Vic(nn.Module):
             drop_path_rate=pred_drop_path_rate
         )
 
-        self.projector = Projector(embed_dim, sizes)
-    
-
-    def Projector(embed_dim, sizes):
-        sizes = [embed_dim] + sizes
-        layers = []
-        for i in range(len(sizes) - 2):
-            layers.append(nn.Linear(sizes[i], sizes[i + 1]))
-            layers.append(nn.BatchNorm1d(sizes[i + 1]))
-            layers.append(nn.ReLU(True))
-        layers.append(nn.Linear(sizes[-2], sizes[-1], bias=False))
-        return nn.Sequential(*layers)
+        self.student_projector = Projector(embed_dim, sizes, num_frames-M)
+        self.teacher_projector = Projector(embed_dim, sizes, num_frames)
         
 
     @torch.no_grad() 
@@ -678,7 +679,8 @@ class IJEPA_Vic(nn.Module):
 
         #if mode is test, we get return full embedding:
         if self.mode == 'test':
-            encoding = self.projector(self.student_encoder(x, B, T, W)) # input in format 'b (t h w) m',output in format 'b t (h w) m' (batch frames n_patches embed_dim)
+            # Check if projector gives error, if so it's because it receives 11 frames and not 18? to solve change projector batchnorm 
+            encoding = self.student_projector(self.student_encoder(x, B, T, W)) # input in format 'b (t h w) m',output in format 'b t (h w) m' (batch frames n_patches embed_dim)
             encoding = self.norm(encoding)
             n = encoding.shape[2]
             encoding = rearrange(encoding, 'b t (h w) m -> b (t h w) m',b=B,t=T,w=W)
@@ -697,12 +699,12 @@ class IJEPA_Vic(nn.Module):
         
         # #get target embeddings
         # input in format 'b (t h w) m', output in format (1) 'b 11 (h w) m' and (2) 'b t (h w) m'
-        target_blocks, mask_indices = self.get_target_block(self.teacher_encoder, self.projector,x,B,T,W)
+        target_blocks, mask_indices = self.get_target_block(self.teacher_encoder, self.teacher_projector,x,B,T,W)
 
         #get context embeddings
         context_block = self.get_context_block(x, B, T, W, mask_indices)
 
-        context_encoding = self.projector(self.student_encoder(context_block, B, T-self.M, W))
+        context_encoding = self.student_projector(self.student_encoder(context_block, B, T-self.M, W))
         context_encoding = self.norm(context_encoding)
         context_encoding = rearrange(context_encoding, 'b t (h w) m -> b (t h w) m',b=B,t=T-self.M,w=W)
 

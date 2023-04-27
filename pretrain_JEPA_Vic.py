@@ -15,7 +15,7 @@ import warnings
 from video_dataset import VideoFrameDataset, ImglistToTensor
 from argparse import ArgumentParser, Namespace
 
-from models import IJEPA_base, CustomDataParallel, EarlyStop
+from models import IJEPA_Vic, CustomDataParallel, EarlyStop
 
 def parse_args() -> Namespace:
     parser = ArgumentParser("JEPA")
@@ -57,9 +57,9 @@ def load_data(root, annotation_file, batch_size=2):
     return dataloader
 
 def off_diagonal(x):
-    n, m = x.shape
+    b, n, m = x.shape
     assert n == m
-    return x.flatten()[:-1].view(n - 1, n + 1)[:, 1:].flatten()
+    return x.flatten(1)[:,:-1].view(b, n - 1, n + 1)[:,:, 1:].flatten()
 
 # Train the model
 def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_dataloader, num_epochs, output_dir, device, early_stop, m=0.996, m_start_end=(.996, 1.), loss_coeffs=[25.0, 25.0, 1.0]):
@@ -90,11 +90,13 @@ def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_d
             std_target_blocks = torch.sqrt(target_blocks.var(dim=0) + 0.0001)
             std_loss = torch.mean(F.relu(1 - std_prediction_blocks)) / 2 + torch.mean(F.relu(1 - std_target_blocks)) / 2
 
-            cov_prediction_blocks = (prediction_blocks.T @ prediction_blocks) / (prediction_blocks.shape[0]- 1)
-            cov_target_blocks = (target_blocks.T @ target_blocks) / (target_blocks.shape[0] - 1)
+            prediction_blocks = rearrange(prediction_blocks, 'b t n m -> b (t n) m')
+            target_blocks = rearrange(target_blocks, 'b t n m -> b (t n) m')
+            cov_prediction_blocks = (prediction_blocks.transpose(1,2) @ prediction_blocks) / (prediction_blocks.shape[0]- 1)
+            cov_target_blocks = (target_blocks.transpose(1,2) @ target_blocks) / (target_blocks.shape[0] - 1)
             cov_loss = off_diagonal(cov_prediction_blocks).pow_(2).sum().div(
-                model.sizes[-1]
-            ) + off_diagonal(cov_target_blocks).pow_(2).sum().div(model.sizes[-1])
+                model.module.embed_dim
+            ) + off_diagonal(cov_target_blocks).pow_(2).sum().div(model.module.embed_dim)
 
             loss = (
                 loss_coeffs[0] * repr_loss
@@ -108,8 +110,8 @@ def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_d
             scaler.step(optimizer)
             scaler.update()
 
-            student_model = model.student_encoder.eval()
-            teacher_model = model.teacher_encoder.eval()
+            student_model = model.module.student_encoder.eval()
+            teacher_model = model.module.teacher_encoder.eval()
             with torch.no_grad():
                 for student_param, teacher_param in zip(student_model.parameters(), teacher_model.parameters()):
                     teacher_param.data.mul_(m).add_(1 - m, student_param.data)
@@ -188,7 +190,7 @@ if __name__ == "__main__":
     num_epochs = 100
     div_factor = 10 # max_lr/div_factor = initial lr
     final_div_factor = 100 # final lr is initial_lr/final_div_factor 
-    batch_size = 2
+    batch_size = 8
     patience = 10
 
     args = parse_args()
