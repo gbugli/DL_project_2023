@@ -232,28 +232,13 @@ if __name__ == "__main__":
     epoch = 0
 
     # get these params from a global config?
-    model = IJEPA_base(img_size=128, patch_size=16, in_chans=3, norm_layer=nn.LayerNorm, num_frames=22, attention_type='joint_space_time', dropout=0.1, mode="train", r=0.5, embed_dim=768, device=device,
+    model = IJEPA_base(img_size=128, patch_size=8, in_chans=3, norm_layer=nn.LayerNorm, num_frames=22, attention_type='joint_space_time', dropout=0.1, mode="train", M=11, embed_dim=384, device=device,
                         # encoder parameters
                         enc_depth=4,
                         enc_num_heads=6,
-                        enc_mlp_ratio=4.,
-                        enc_qkv_bias=False,
-                        enc_qk_scale=None,
-                        enc_drop_rate=0.,
-                        enc_attn_drop_rate=0.,
-                        enc_drop_path_rate=0.1,
                         # predictor parameters
                         pred_depth=4,
-                        pred_num_heads=6,
-                        pred_mlp_ratio=4.,
-                        pred_qkv_bias=False,
-                        pred_qk_scale=None,
-                        pred_drop_rate=0.1,
-                        pred_attn_drop_rate=0.1,
-                        pred_drop_path_rate=0.1,
-                        # positional and spacial embedding parameters
-                        pos_drop_rate=0.1,
-                        time_drop_rate=0.1)
+                        pred_num_heads=6)
     # Leave this to load properly the optimizer dict
     model.to(device)
 
