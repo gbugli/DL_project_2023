@@ -16,7 +16,7 @@ import warnings
 from video_dataset import VideoFrameDataset, ImglistToTensor
 from argparse import ArgumentParser, Namespace
 
-from models import IJEPA_base, CustomDataParallel, EarlyStop
+from models import IJEPA_base, EarlyStop
 
 def parse_args() -> Namespace:
     parser = ArgumentParser("JEPA")
