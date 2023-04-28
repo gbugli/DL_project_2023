@@ -123,8 +123,8 @@ def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_d
 
             if i % 20 == 0 and epoch < 20:
               context_cos_sim, sense_check = mean_cosine_similarity(context_embeddings)
-              target_cos_sim, sense_check = mean_cosine_similarity(target_blocks)
-              pred_cos_sim, sense_check = mean_cosine_similarity(prediction_blocks)
+              target_cos_sim, sense_check = mean_cosine_similarity(rearrange(target_blocks, ' b t (n) m -> b (t n) m'))
+              pred_cos_sim, sense_check = mean_cosine_similarity(rearrange(prediction_blocks, ' b t (n) m -> b (t n) m'))
               print(f"Current loss: {loss.item()}")
               print(f"Overall pred rank: {compute_rank(prediction_blocks)}, Context rank per frame: {compute_rank_per_frame(rearrange(context_embeddings, 'b (t n) m -> b t n m', t=22))}")
               print(f"Context cos_sim: {context_cos_sim}, Target cos_sim: {target_cos_sim}, Pred cos_sim: {pred_cos_sim}, Sense check: {sense_check}")
