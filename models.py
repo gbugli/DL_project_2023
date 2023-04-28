@@ -12,6 +12,36 @@ import warnings
 from video_dataset import VideoFrameDataset, ImglistToTensor
 from x_transformers import Encoder, Decoder
 
+class EarlyStop:
+    def __init__(self, patience, loss=False):
+        self.patience = patience
+        self.best_value = np.inf if loss else 0
+        self.best_epoch = 0
+        self.loss = loss
+
+    def step(self, current_value, current_epoch):
+        print("Current:{} Best:{}".format(current_value, self.best_value))
+        if self.loss:
+            if current_value < self.best_value:
+                self.best_value = current_value
+                self.best_epoch = current_epoch
+        else:
+            if current_value > self.best_value:
+                self.best_value = current_value
+                self.best_epoch = current_epoch
+
+    def stop_training(self, current_epoch) -> bool:
+        return current_epoch - self.best_epoch > self.patience
+
+
+class CustomDataParallel(nn.DataParallel):
+    """
+    Wrapper for scoring with nn.DataParallel object containing LTRModel.
+    """
+
+    def forward(self, x):
+        return self.module.forward(x)  # type: ignore
+
 
 class PatchEmbed(nn.Module):
     """ Image to Patch Embedding
