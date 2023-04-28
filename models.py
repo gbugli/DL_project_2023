@@ -66,13 +66,12 @@ class PatchEmbed(nn.Module):
         return x, T, W
     
 class Predictor(nn.Module):
-    def __init__(self, embed_dim, num_heads, depth):
+    def __init__(self, embed_dim, num_heads, depth, layer_dropout):
         super().__init__()
         
-        self.predictor = Decoder(dim = embed_dim, depth = depth, heads = num_heads)
-    def forward(self, context_encoding, target_masks):
-        x = torch.cat((context_encoding, target_masks), dim = 1)
-        x = self.predictor(x)
+        self.predictor = Decoder(dim = embed_dim, depth = depth, heads = num_heads, layer_dropout=layer_dropout)
+    def forward(self, prediction_cat):
+        x = self.predictor(prediction_cat)
         return x
         #return last len(target_masks) tokens
         # l = x.shape[1]
@@ -139,16 +138,19 @@ class IJEPA_base(nn.Module):
         x = target_encoder(x) # input in format 'b (t h w) m',output in format 'b t (h w) m' (batch frames n_patches embed_dim)
         x = self.norm(x)
 
+        x = rearrange(x, 'b (t h w) m -> b t (h w) m',b=B,t=T,w=W)
+
         #select last M frames to mask in x
         mask_indices = torch.arange(22-self.M, 22)
         
         #mask the selected frames in the context block
         target_block = x[:,mask_indices] #get last M frames
         #all_patches = x
+        print(target_block.shape)
         return target_block, mask_indices
 
     ### get the context block
-    def get_context_block(self, x, mask_indices):
+    def get_context_block(self, x, B, T, W, mask_indices):
         #reshape x to format 'b t (h w) m'
         x = rearrange(x, 'b (t h w) m -> b t (h w) m',b=B,t=T,w=W)
         #select all frames which are not masked
@@ -186,7 +188,7 @@ class IJEPA_base(nn.Module):
             encoding = self.student_encoder(x) # input in format 'b (t h w) m',output in format 'b t (h w) m' (batch frames n_patches embed_dim)
             encoding = self.norm(encoding)
             n = encoding.shape[2]
-            encoding = rearrange(encoding, 'b t (h w) m -> b (t h w) m',b=B,t=T,w=W)
+            # encoding = rearrange(encoding, 'b t (h w) m -> b (t h w) m',b=B,t=T,w=W)
             #add 11 mask tokens to the end of the embedding
             target_masks = self.mask_token.repeat(B, 11, n, 1)
             target_pos_embedding = self.pos_embed.unsqueeze(1)
@@ -198,7 +200,7 @@ class IJEPA_base(nn.Module):
             
             target_masks = rearrange(target_masks, 'b t (h w) m -> b (t h w) m',b=B,t=11,w=W)
             encoding = torch.cat((encoding, target_masks), dim=1)
-            return self.predictor(encoding) # predict the masked frames
+            return rearrange(self.predictor(encoding), 'b (t h w) m -> b t (h w) m',b=B,t=T,w=W) # predict the masked frames
         
         # #get target embeddings
         # input in format 'b (t h w) m', output in format (1) 'b 11 (h w) m' and (2) 'b t (h w) m'
@@ -209,7 +211,7 @@ class IJEPA_base(nn.Module):
 
         context_encoding = self.student_encoder(context_block)
         context_encoding = self.norm(context_encoding)
-        context_encoding = rearrange(context_encoding, 'b t (h w) m -> b (t h w) m',b=B,t=T-self.M,w=W)
+        # context_encoding = rearrange(context_encoding, 'b t (h w) m -> b (t h w) m',b=B,t=T-self.M,w=W)
 
         #n = h x w
         n = target_blocks.shape[2]
@@ -224,7 +226,7 @@ class IJEPA_base(nn.Module):
         target_masks = rearrange(target_masks, 'b t (h w) m -> b (t h w) m',b=B,t=self.M,w=W)
         prediction_cat = torch.cat((context_encoding, target_masks), dim = 1)
         # make sure that the preds are actually at the end
-        prediction_blocks = self.predictor(prediction_cat)
+        prediction_blocks = rearrange(self.predictor(prediction_cat), 'b (t h w) m -> b t (h w) m',b=B,t=T,w=W)
 
         prediction_blocks = prediction_blocks[:,-self.M:]
         return prediction_blocks, target_blocks, context_encoding

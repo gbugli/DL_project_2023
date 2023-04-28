@@ -204,7 +204,7 @@ if __name__ == "__main__":
     num_epochs = 100
     div_factor = 10 # max_lr/div_factor = initial lr
     final_div_factor = 100 # final lr is initial_lr/final_div_factor 
-    batch_size = 8
+    batch_size = 4
     patience = 50
 
     args = parse_args()
