@@ -178,9 +178,7 @@ class IJEPA_base(nn.Module):
         return x, B, T, W
     
     def forward(self, x):
-        print('input shape: ', x.shape)
         x, B, T, W = self.get_patch_embeddings(x)
-        print('patch embeddings shape: ', x.shape)
         x = self.post_emb_norm(x)
 
         #if mode is test, we get return full embedding:
@@ -205,15 +203,12 @@ class IJEPA_base(nn.Module):
         # #get target embeddings
         # input in format 'b (t h w) m', output in format (1) 'b 11 (h w) m' and (2) 'b t (h w) m'
         target_blocks, mask_indices = self.get_target_block(self.teacher_encoder,x,B,T,W)
-        print('target blocks shape: ', target_blocks.shape)
 
         #get context embeddings
         context_block = self.get_context_block(x, B, T, W, mask_indices)
-        print('context block shape: ', context_block.shape)
 
         context_encoding = self.student_encoder(context_block)
         context_encoding = self.norm(context_encoding)
-        print('context encoding shape: ', context_encoding.shape)
         # context_encoding = rearrange(context_encoding, 'b t (h w) m -> b (t h w) m',b=B,t=T-self.M,w=W)
 
         #n = h x w
