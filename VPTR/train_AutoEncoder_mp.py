@@ -5,9 +5,15 @@ import torchvision.transforms as transforms
 from torch.utils.data import Dataset, DataLoader, random_split
 from torch.utils.tensorboard import SummaryWriter
 
+import torch.distributed as dist
+import torch.multiprocessing as mp
+
+from torch.nn.parallel import DistributedDataParallel as DDP
+
 from pathlib import Path
 import random
 from datetime import datetime
+import os
 
 from model import VPTREnc, VPTRDec, VPTRDisc, init_weights
 from model import GDL, MSELoss, L1Loss, GANLoss
@@ -15,6 +21,11 @@ from utils import get_dataloader
 from utils import VidCenterCrop, VidPad, VidResize, VidNormalize, VidReNormalize, VidCrop, VidRandomHorizontalFlip, VidRandomVerticalFlip, VidToTensor
 from utils import visualize_batch_clips, save_ckpt, load_ckpt, set_seed, AverageMeters, init_loss_dict, write_summary, resume_training
 from utils import set_seed
+
+import argparse
+
+parser = argparse.ArgumentParser(description='Datadistributed training')
+parser.add_argument('--port', default='12355', type=str, help = '')
 
 set_seed(2021)
 
@@ -103,29 +114,21 @@ def show_samples(VPTR_Enc, VPTR_Dec, sample, save_dir, renorm_transform):
         idx = min(N, 4)
         visualize_batch_clips(past_frames[0:idx, :, ...], rec_future_frames[0:idx, :, ...], rec_past_frames[0:idx, :, ...], save_dir, renorm_transform, desc = 'ae')
 
-if __name__ == '__main__':
-    ckpt_save_dir = Path('output/test_1/models/partial')
-    tensorboard_save_dir = Path('output/test_1/tensorboard')
+def setup(rank, world_size, args):
+    # initialize the process group
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = args.port
+    dist.init_process_group("nccl", rank=rank, world_size=world_size)
 
-    #resume_ckpt = ckpt_save_dir.joinpath('epoch_45.tar')
-    resume_ckpt = None
-    start_epoch = 0
+def cleanup():
+    dist.destroy_process_group()
 
-    summary_writer = SummaryWriter(tensorboard_save_dir.absolute().as_posix())
-    num_past_frames = 11
-    num_future_frames = 11
-    encH, encW, encC = 6, 6, 528
-    img_channels = 3 #3 channels for BAIR datset
-    epochs = 50
-    N = 2
-    AE_lr = 2e-4
-    lam_gan = 0.01
-    device = torch.device('cuda')
+def main_worker(rank, args, world_size, img_channels, encC, encH, encW, N, AE_lr, train_dir, val_dir, lam_gan,
+                data_set_name, epochs, ckpt_save_dir, tensorboard_save_dir, num_past_frames, 
+                num_future_frames, num_workers, show_example_epochs, save_ckpt_epochs, device):
+    setup(rank, world_size, args)
+    torch.cuda.set_device(rank)
 
-    #####################Init Dataset ###########################
-    data_set_name = 'BAIR' #see utils.dataset
-    train_dir = '/unlabeled'
-    val_dir = '/val'
     train_loader, val_loader, test_loader, renorm_transform = get_dataloader(data_set_name, N, train_dir, val_dir, num_past_frames, num_future_frames)
 
     #####################Init Models and Optimizer ###########################
@@ -192,4 +195,45 @@ if __name__ == '__main__':
         epoch_time = datetime.now() - epoch_st
         print(f'epoch {epoch}', EpochAveMeter.meters['AE_total'])
         print(f"Estimated remaining training time: {epoch_time.total_seconds()/3600. * (start_epoch + epochs - epoch)} Hours")
+    cleanup()
+
+if __name__ == '__main__':
+    set_seed(3407)
+    args = parser.parse_args()
+
+    ckpt_save_dir = Path('output/test_1/models/partial')
+    tensorboard_save_dir = Path('output/test_1/tensorboard')
+
+    #resume_ckpt = ckpt_save_dir.joinpath('epoch_45.tar')
+    resume_ckpt = None
+    start_epoch = 0
+
+    summary_writer = SummaryWriter(tensorboard_save_dir.absolute().as_posix())
+    num_past_frames = 11
+    num_future_frames = 11
+    encH, encW, encC = 6, 6, 528
+    img_channels = 3 #3 channels for BAIR datset
+    epochs = 50
+    N = 2
+    AE_lr = 2e-4
+    lam_gan = 0.01
+    device = torch.device('cuda')
+
+    #####################Init Dataset ###########################
+    data_set_name = 'BAIR' #see utils.dataset
+    train_dir = '/unlabeled'
+    val_dir = '/val'
+
+    num_workers = 1
+    world_size = 4
+
+    show_example_epochs = 1
+    save_ckpt_epochs = 1
+
+    print("Start training....")
+    mp.spawn(main_worker,
+             args=(args, world_size, img_channels, encC, encH, encW, N, AE_lr, train_dir, val_dir, lam_gan,
+                data_set_name, epochs, ckpt_save_dir, tensorboard_save_dir, num_past_frames, 
+                num_future_frames, num_workers, show_example_epochs, save_ckpt_epochs, device),
+             nprocs=world_size)
         

@@ -45,7 +45,8 @@ def get_dataloader(data_set_name, batch_size, train_dir, val_dir, test_past_fram
     
     
     elif data_set_name == 'BAIR':
-        #dataset_dir = Path(train_dir)
+        train_dir = Path(train_dir)
+        val_dir = Path(val_dir)
         norm_transform = VidNormalize((0.61749697, 0.6050092, 0.52180636), (2.1824553, 2.1553133, 1.9115673))
         renorm_transform = VidReNormalize((0.61749697, 0.6050092, 0.52180636), (2.1824553, 2.1553133, 1.9115673))
         #norm_transform = VidNormalize((0.6175636, 0.60508573, 0.52188003), (2.8584306, 2.8212209, 2.499153))
@@ -60,7 +61,7 @@ def get_dataloader(data_set_name, batch_size, train_dir, val_dir, test_past_fram
         train_set, val_set = random_split(BAIR_train_whole_set, [BAIR_train_set_length, BAIR_val_set_length],
                                         generator=torch.Generator().manual_seed(2021))
 
-        test_set = BAIRDataset(val_dir.joinpath('test/data'), transform, color_mode = 'RGB', 
+        test_set = BAIRDataset(val_dir.joinpath('data'), transform, color_mode = 'RGB', 
                                 num_past_frames = 11, num_future_frames = test_future_frames)()
 
     N = batch_size
@@ -257,7 +258,7 @@ class ClipDataset(Dataset):
         clip_imgs = self.clips[index]
         imgs = []
         for img_path in clip_imgs:
-            if img_path.endswith('.npy'):
+            if img_path.name.endswith('.npy'):
                 continue
             if self.color_mode == 'RGB':
                 img = Image.open(img_path.absolute().as_posix()).convert('RGB')

@@ -129,9 +129,9 @@ if __name__ == '__main__':
     train_loader, val_loader, test_loader, renorm_transform = get_dataloader(data_set_name, N, train_dir, val_dir, num_past_frames, num_future_frames)
 
     #####################Init Models and Optimizer ###########################
-    VPTR_Enc = VPTREnc(img_channels, feat_dim = encC, n_downsampling = 3).to(device)
-    VPTR_Dec = VPTRDec(img_channels, feat_dim = encC, n_downsampling = 3, out_layer = 'Tanh').to(device) #Sigmoid for MNIST, Tanh for KTH and BAIR
-    VPTR_Disc = VPTRDisc(img_channels, ndf=64, n_layers=3, norm_layer=nn.BatchNorm2d).to(device)
+    VPTR_Enc = nn.DataParallel(VPTREnc(img_channels, feat_dim = encC, n_downsampling = 3)).to(device)
+    VPTR_Dec = nn.DataParallel(VPTRDec(img_channels, feat_dim = encC, n_downsampling = 3, out_layer = 'Tanh')).to(device) #Sigmoid for MNIST, Tanh for KTH and BAIR
+    VPTR_Disc = nn.DataParallel(VPTRDisc(img_channels, ndf=64, n_layers=3, norm_layer=nn.BatchNorm2d)).to(device)
     init_weights(VPTR_Disc)
     init_weights(VPTR_Enc)
     init_weights(VPTR_Dec)
