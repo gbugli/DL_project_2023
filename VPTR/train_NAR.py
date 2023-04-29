@@ -139,9 +139,9 @@ def NAR_show_samples(VPTR_Enc, VPTR_Dec, VPTR_Transformer, sample, save_dir):
 if __name__ == '__main__':
     set_seed(2021)
 
-    ckpt_save_dir = Path('/home/travail/xiyex/VPTR_ckpts/BAIR_NAR_MSEGDL_BPNCE01_RPE_ckpt')
-    tensorboard_save_dir = Path('/home/travail/xiyex/VPTR_ckpts/BAIR_NAR_MSEGDL_BPNCE01_RPE_tensorboard')
-    resume_AE_ckpt = Path('/home/travail/xiyex/VPTR_ckpts/BAIR_ResNetAE_MSEGDL_ckpt').joinpath('epoch_64.tar')
+    ckpt_save_dir = Path('/scratch/gb2572/DL_project_2023/output/test_NAR/models/partial')
+    tensorboard_save_dir = Path('/scratch/gb2572/DL_project_2023/output/test_NAR/tensorboard')
+    resume_AE_ckpt = Path('/scratch/gb2572/DL_project_2023/output/test_vptr/models/partial').joinpath('epoch_3.tar')
     #resume_ckpt = ckpt_save_dir.joinpath('epoch_88.tar')
     resume_ckpt = None
 
@@ -157,14 +157,14 @@ if __name__ == '__main__':
     start_epoch = 0
 
     summary_writer = SummaryWriter(tensorboard_save_dir.absolute().as_posix())
-    num_past_frames = 2
-    num_future_frames = 10
-    encH, encW, encC = 8, 8, 528
+    num_past_frames = 11
+    num_future_frames = 11
+    encH, encW, encC = 6, 6, 528
     img_channels = 3
     epochs = 100
-    N = 16
+    N = 4
     #AE_lr = 2e-4
-    Transformer_lr = 1e-4
+    Transformer_lr = 1e-5
     max_grad_norm = 1.0 
     TSLMA_flag = False
     rpe = True
@@ -179,14 +179,15 @@ if __name__ == '__main__':
 
     #####################Init Dataset ###########################
     data_set_name = 'BAIR'
-    dataset_dir = '/home/travail/xiyex/BAIR'
-    test_past_frames = 2
-    test_future_frames = 10
-    train_loader, val_loader, test_loader, renorm_transform = get_dataloader(data_set_name, N, dataset_dir, test_past_frames, test_future_frames)
+    train_dir = '/unlabeled'
+    val_dir = '/val'
+    test_past_frames = 11
+    test_future_frames = 11
+    train_loader, val_loader, test_loader, renorm_transform = get_dataloader(data_set_name, N, train_dir, val_dir, test_past_frames, test_future_frames)
 
     #####################Init model###########################
-    VPTR_Enc = VPTREnc(img_channels, feat_dim = encC, n_downsampling = 3, padding_type = padding_type).to(device)
-    VPTR_Dec = VPTRDec(img_channels, feat_dim = encC, n_downsampling = 3, out_layer = 'Tanh', padding_type = padding_type).to(device)
+    VPTR_Enc = VPTREnc(img_channels, feat_dim = encC, n_downsampling = 3).to(device)
+    VPTR_Dec = VPTRDec(img_channels, feat_dim = encC, n_downsampling = 3, out_layer = 'Tanh').to(device)
     VPTR_Enc = VPTR_Enc.eval()
     VPTR_Dec = VPTR_Dec.eval()
 

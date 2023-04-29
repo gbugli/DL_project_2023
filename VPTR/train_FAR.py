@@ -136,9 +136,9 @@ def FAR_show_sample(VPTR_Enc, VPTR_Dec, VPTR_Transformer, num_pred, sample, save
 
 if __name__ == '__main__':
     set_seed(2021)
-    ckpt_save_dir = Path('/home/travail/xiyex/VPTR_ckpts/MNIST_FAR_MSEGDL_ckpt')
-    tensorboard_save_dir = Path('/home/travail/xiyex/VPTR_ckpts/MNIST_FAR_MSEGDL_tensorboard')
-    resume_AE_ckpt = Path('/home/travail/xiyex/VPTR_ckpts/MNIST_ResNetAE_MSEGDLgan001_ckpt').joinpath('epoch_93.tar')
+    ckpt_save_dir = Path('/scratch/gb2572/DL_project_2023/output/test_NAR/models/partial')
+    tensorboard_save_dir = Path('/scratch/gb2572/DL_project_2023/output/test_NAR/tensorboard')
+    resume_AE_ckpt = Path('/scratch/gb2572/DL_project_2023/output/test_vptr/models/partial').joinpath('epoch_3.tar')
     #resume_ckpt = ckpt_save_dir.joinpath('epoch_179.tar')
     resume_ckpt = None
 
@@ -153,31 +153,32 @@ if __name__ == '__main__':
 
     start_epoch = 0
     summary_writer = SummaryWriter(tensorboard_save_dir.absolute().as_posix())
-    num_past_frames = 10
-    num_future_frames = 10
-    encH, encW, encC = 8, 8, 528
-    img_channels = 1 #3 channels for BAIR
+    num_past_frames = 11
+    num_future_frames = 11
+    encH, encW, encC = 6, 6, 528
+    img_channels = 3 #3 channels for BAIR
     epochs = 100
-    N = 10
+    N = 1
     #AE_lr = 2e-4
     Transformer_lr = 1e-4
     max_grad_norm = 1.0 
     rpe = False
     lam_gan = 0.001
     dropout = 0.1
-    device = torch.device('cuda:0')
+    device = torch.device('cuda')
     val_per_epochs = 4
 
     #####################Init Dataset ###########################
-    data_set_name = 'MNIST'
-    dataset_dir = '/home/travail/xiyex/MovingMNIST'
-    test_past_frames = 10
-    test_future_frames = 10
-    train_loader, val_loader, test_loader, renorm_transform = get_dataloader(data_set_name, N, dataset_dir, test_past_frames, test_future_frames)
+    data_set_name = 'BAIR'
+    train_dir = '/unlabeled'
+    val_dir = '/val'
+    test_past_frames = 11
+    test_future_frames = 11
+    train_loader, val_loader, test_loader, renorm_transform = get_dataloader(data_set_name, N, train_dir, val_dir, test_past_frames, test_future_frames)
 
     #####################Init model###########################
     VPTR_Enc = VPTREnc(img_channels, feat_dim = encC, n_downsampling = 3).to(device)
-    VPTR_Dec = VPTRDec(img_channels, feat_dim = encC, n_downsampling = 3, out_layer = 'Sigmoid').to(device) #Tanh for KTH and BAIR
+    VPTR_Dec = VPTRDec(img_channels, feat_dim = encC, n_downsampling = 3, out_layer = 'Tanh').to(device)
     VPTR_Enc = VPTR_Enc.eval()
     VPTR_Dec = VPTR_Dec.eval()
 
@@ -189,8 +190,8 @@ if __name__ == '__main__':
     init_weights(VPTR_Dec)
 
     VPTR_Transformer = VPTRFormerFAR(num_past_frames, num_future_frames, encH=encH, encW = encW, d_model=encC, 
-                                nhead=8, num_encoder_layers=12, dropout=dropout, 
-                                window_size=4, Spatial_FFN_hidden_ratio=4, rpe=rpe).to(device)
+                                nhead=4, num_encoder_layers=4, dropout=dropout, 
+                                window_size=16, Spatial_FFN_hidden_ratio=4, rpe=rpe).to(device)
 
     optimizer_D = None
     #optimizer_D = torch.optim.Adam(params = VPTR_Disc.parameters(), lr = Transformer_lr, betas = (0.5, 0.999))

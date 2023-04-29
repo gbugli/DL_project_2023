@@ -104,10 +104,10 @@ def show_samples(VPTR_Enc, VPTR_Dec, sample, save_dir, renorm_transform):
         visualize_batch_clips(past_frames[0:idx, :, ...], rec_future_frames[0:idx, :, ...], rec_past_frames[0:idx, :, ...], save_dir, renorm_transform, desc = 'ae')
 
 if __name__ == '__main__':
-    ckpt_save_dir = Path('output/test_1/models/partial')
-    tensorboard_save_dir = Path('output/test_1/tensorboard')
+    ckpt_save_dir = Path('/scratch/gb2572/DL_project_2023/output/test_vptr_2/models/partial')
+    tensorboard_save_dir = Path('/scratch/gb2572/DL_project_2023/output/test_vptr_2/tensorboard')
 
-    #resume_ckpt = ckpt_save_dir.joinpath('epoch_45.tar')
+    # resume_ckpt = ckpt_save_dir.joinpath('epoch_3.tar')
     resume_ckpt = None
     start_epoch = 0
 
@@ -117,8 +117,8 @@ if __name__ == '__main__':
     encH, encW, encC = 6, 6, 528
     img_channels = 3 #3 channels for BAIR datset
     epochs = 50
-    N = 2
-    AE_lr = 2e-4
+    N = 4
+    AE_lr = 2e-5
     lam_gan = 0.01
     device = torch.device('cuda')
 
@@ -156,7 +156,7 @@ if __name__ == '__main__':
     if resume_ckpt is not None:
         loss_dict, start_epoch = resume_training({'VPTR_Enc': VPTR_Enc, 'VPTR_Dec': VPTR_Dec, 'VPTR_Disc': VPTR_Disc}, 
                                                 {'optimizer_G': optimizer_G, 'optimizer_D': optimizer_D}, 
-                                                loss_name_list, resume_ckpt)
+                                                resume_ckpt, loss_name_list, device)
 
 
     #####################Training loop ###########################                                            
@@ -168,6 +168,9 @@ if __name__ == '__main__':
         for idx, sample in enumerate(train_loader, 0):
             iter_loss_dict = single_iter(VPTR_Enc, VPTR_Dec, VPTR_Disc, optimizer_G, optimizer_D, sample, device, train_flag = True)
             EpochAveMeter.iter_update(iter_loss_dict)
+
+            if idx % 50 == 0:
+                print(f'Current batch loss: {iter_loss_dict["AE_total"]}')
             
         loss_dict = EpochAveMeter.epoch_update(loss_dict, epoch, train_flag = True)
         write_summary(summary_writer, loss_dict, train_flag = True)

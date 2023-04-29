@@ -19,7 +19,7 @@ from model import VPTREnc, VPTRDec, VPTRDisc, init_weights, VPTRFormerNAR, VPTRF
 from model import GDL, MSELoss, L1Loss, GANLoss, BiPatchNCE
 from utils import KTHDataset, BAIRDataset, MovingMNISTDataset
 from utils import get_dataloader
-from utils import visualize_batch_clips, save_ckpt, load_ckpt, set_seed, AverageMeters, init_loss_dict, write_summary, resume_training
+from utils import visualize_batch_clips, save_ckpt, load_ckpt, set_seed, AverageMeters, init_loss_dict, write_summary, resume_training, resume_training_parallel
 from utils import set_seed, gather_AverageMeters
 
 import logging
@@ -99,8 +99,8 @@ def cal_lossT(fake_imgs, real_imgs, VPTR_Disc, mse_loss, gdl_loss, lam_gan):
 def init_models(img_channels, encC, encH, encW, dropout, out_layer, rpe, rank, Transformer_lr, resume_AE_ckpt, resume_Transformer_ckpt = None, num_encoder_layers = 12, num_past_frames = 10, 
                 num_future_frames = 10, init_Disc = False, train_Disc = False, padding_type = 'reflect'):
     
-    VPTR_Enc = VPTREnc(img_channels, feat_dim = encC, n_downsampling = 3, padding_type = padding_type).to(rank)
-    VPTR_Dec = VPTRDec(img_channels, feat_dim = encC, n_downsampling = 3, out_layer = out_layer, padding_type = padding_type).to(rank)
+    VPTR_Enc = VPTREnc(img_channels, feat_dim = encC, n_downsampling = 3).to(rank)
+    VPTR_Dec = VPTRDec(img_channels, feat_dim = encC, n_downsampling = 3, out_layer = out_layer).to(rank)
     #load the trained autoencoder, we initialize the discriminator from scratch, for a balanced training
     start_epoch, history_loss_dict = resume_training({'VPTR_Enc': VPTR_Enc, 'VPTR_Dec': VPTR_Dec}, {}, resume_AE_ckpt, map_location = f'cuda:{rank}')
     loss_name_list = ['T_MSE', 'T_GDL', 'T_gan', 'T_total', 'Dtotal', 'Dfake', 'Dreal']
@@ -127,7 +127,7 @@ def init_models(img_channels, encC, encH, encW, dropout, out_layer, rpe, rank, T
     optimizer_T = torch.optim.AdamW(params = VPTR_Transformer.parameters(), lr = Transformer_lr)
 
     if resume_Transformer_ckpt is not None:
-        start_epoch, history_loss_dict = resume_training({'VPTR_Transformer': VPTR_Transformer}, {'optimizer_T':optimizer_T}, resume_Transformer_ckpt, map_location = f'cuda:{rank}')
+        start_epoch, history_loss_dict = resume_training_parallel({'VPTR_Transformer': VPTR_Transformer}, {'optimizer_T':optimizer_T}, resume_Transformer_ckpt, map_location = f'cuda:{rank}')
         loss_dict = init_loss_dict(loss_name_list, history_loss_dict)
     VPTR_Transformer = DDP(VPTR_Transformer, device_ids=[rank])
 
@@ -207,7 +207,7 @@ def cleanup():
     dist.destroy_process_group()
 
 def main_worker(rank, args, world_size, img_channels, encC, encH, encW, dropout, out_layer, rpe, Transformer_lr, max_grad_norm, lam_gan, resume_AE_ckpt,
-                data_set_name, batch_size, data_set_dir, dev_set_size, epochs, ckpt_save_dir, tensorboard_save_dir,
+                data_set_name, batch_size, train_dir, val_dir, dev_set_size, epochs, ckpt_save_dir, tensorboard_save_dir,
                 resume_Transformer_ckpt = None, num_encoder_layers = 12, num_past_frames = 10, 
                 num_future_frames = 10, init_Disc = False, train_Disc = False,
                 num_workers = 8, show_example_epochs = 10, save_ckpt_epochs = 2, padding_type = 'reflect'):
@@ -230,7 +230,7 @@ def main_worker(rank, args, world_size, img_channels, encC, encH, encW, dropout,
     mse_loss, gdl_loss, gan_loss, loss_name_list = init_models(img_channels, encC, encH, encW, dropout, out_layer, rpe, rank, Transformer_lr, resume_AE_ckpt, 
                                            resume_Transformer_ckpt, num_encoder_layers, num_past_frames, 
                                            num_future_frames, init_Disc, train_Disc, padding_type)
-    train_loader, val_loader, _, renorm_transform = get_dataloader(data_set_name, batch_size, data_set_dir, ngpus = world_size, num_workers = num_workers)
+    train_loader, val_loader, _, renorm_transform = get_dataloader(data_set_name, batch_size, train_dir, val_dir, ngpus = world_size, num_workers = num_workers)
     
     for epoch in range(start_epoch+1, start_epoch + epochs+1):
         epoch_st = datetime.now()
@@ -241,6 +241,8 @@ def main_worker(rank, args, world_size, img_channels, encC, encH, encW, dropout,
             iter_loss_dict = single_iter(VPTR_Enc, VPTR_Dec, VPTR_Disc, VPTR_Transformer, optimizer_T, optimizer_D, 
                                          sample, rank, mse_loss, gdl_loss, gan_loss, lam_gan, max_grad_norm, train_flag = True)
             train_EpochAveMeter.iter_update(iter_loss_dict)
+            if idx% 50 == 0 and epoch < 6:
+                print(idx)
 
         train_ave_meters = [None for i in range(world_size)]
         dist.all_gather_object(train_ave_meters, train_EpochAveMeter)
@@ -279,26 +281,27 @@ if __name__ == '__main__':
     set_seed(3407)
     args = parser.parse_args()
 
-    ckpt_save_dir = Path('/home/travail/xiyex/VPTR_ckpts/BAIR_FAR_MSEGDL_RPE_mp_ckpt')
-    tensorboard_save_dir = Path('/home/travail/xiyex/VPTR_ckpts/BAIR_FAR_MSEGDL_RPE_mp_tensorboard')
-    resume_AE_ckpt = Path('/home/travail/xiyex/VPTR_ckpts/BAIR_ResNetAE_MSEGDL_ckpt').joinpath('epoch_64.tar')
+    ckpt_save_dir = Path('/scratch/gb2572/DL_project_2023/output/test_NAR/models/partial')
+    tensorboard_save_dir = Path('/scratch/gb2572/DL_project_2023/output/test_NAR/tensorboard')
+    resume_AE_ckpt = Path('/scratch/gb2572/DL_project_2023/output/test_vptr/models/partial').joinpath('epoch_4.tar')
 
-    #resume_Transformer_ckpt = ckpt_save_dir.joinpath('epoch_128.tar')
-    resume_Transformer_ckpt = None
+    resume_Transformer_ckpt = ckpt_save_dir.joinpath('epoch_12.tar')
+    # resume_Transformer_ckpt = None
 
     data_set_name = 'BAIR'
     out_layer = 'Tanh'
-    data_set_dir = '/home/travail/xiyex/BAIR'
+    train_dir = '/unlabeled'
+    val_dir = '/val'
     dev_set_size = 500
     padding_type = 'zero'
 
-    num_past_frames = 2
-    num_future_frames = 10
-    encH, encW, encC = 8, 8, 528
+    num_past_frames = 11
+    num_future_frames = 11
+    encH, encW, encC = 6, 6, 528
     img_channels = 3
     epochs = 30
-    batch_size = 16*4
-    num_encoder_layers = 12
+    batch_size = 1*4
+    num_encoder_layers = 6
 
     #AE_lr = 2e-4
     Transformer_lr = 1e-4
@@ -319,7 +322,7 @@ if __name__ == '__main__':
     print(ckpt_save_dir)
     mp.spawn(main_worker,
              args=(args, world_size, img_channels, encC, encH, encW, dropout, out_layer, rpe, Transformer_lr, max_grad_norm, lam_gan, resume_AE_ckpt,
-                data_set_name, batch_size, data_set_dir, dev_set_size, epochs, ckpt_save_dir, tensorboard_save_dir,
+                data_set_name, batch_size, train_dir, val_dir, dev_set_size, epochs, ckpt_save_dir, tensorboard_save_dir,
                 resume_Transformer_ckpt, num_encoder_layers, num_past_frames, 
                 num_future_frames, init_Disc, train_Disc,
                 num_workers, show_example_epochs, save_ckpt_epochs, padding_type),

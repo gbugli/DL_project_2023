@@ -395,7 +395,7 @@ class MlpDWBN(nn.Module):
         self.fc1 = nn.Conv2d(in_features, hidden_features, kernel_size=1)
         self.act1 = act_layer()
         if AR_model:
-            self.norm1 = nn.LayerNorm((hidden_features, encH, encW))
+            self.norm1 = nn.LayerNorm((hidden_features, 20, 30))
         else:
             self.norm1 = nn.BatchNorm2d(hidden_features)
         self.dw3x3 = nn.Conv2d(
@@ -408,13 +408,13 @@ class MlpDWBN(nn.Module):
         )
         self.act2 = dw_act_layer()
         if AR_model:
-            self.norm2 = nn.LayerNorm((hidden_features, encH, encW))
+            self.norm2 = nn.LayerNorm((hidden_features, 20, 30))
         else:
             self.norm2 = nn.BatchNorm2d(hidden_features)
         self.fc2 = nn.Conv2d(hidden_features, out_features, kernel_size=1)
         self.act3 = act_layer()
         if AR_model:
-            self.norm3 = nn.LayerNorm((out_features, encH, encW))
+            self.norm3 = nn.LayerNorm((out_features, 20, 30))
         else:
             self.norm3 = nn.BatchNorm2d(out_features)
         self.drop = nn.Dropout(drop)
