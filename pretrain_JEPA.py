@@ -121,7 +121,7 @@ def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_d
                     teacher_param.data.mul_(m).add_(1 - m, student_param.data)
             m += (m_start_end[1] - m_start_end[0]) / estimated_stepping_batches
 
-            if i % 20 == 0 and epoch < 20:
+            if i % 100 == 0 and epoch < 20:
               context_cos_sim, sense_check = mean_cosine_similarity(context_embeddings)
               target_cos_sim, sense_check = mean_cosine_similarity(rearrange(target_blocks, ' b t (n) m -> b (t n) m'))
               pred_cos_sim, sense_check = mean_cosine_similarity(rearrange(prediction_blocks, ' b t (n) m -> b (t n) m'))
@@ -149,11 +149,6 @@ def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_d
               prediction_blocks, target_blocks, context_embeddings  = model(inputs.transpose(1, 2))
               loss = criterion(prediction_blocks, target_blocks)
               val_loss += loss.item()
-
-              if i % 20 == 0 and epoch < 20:
-                context_cos_sim, sense_check = mean_cosine_similarity(context_embeddings)
-                target_cos_sim, sense_check = mean_cosine_similarity(target_blocks)
-                print(f"Current loss: {loss.item()}, Context cos_sim: {context_cos_sim}, Target cos_sim: {target_cos_sim}, Sense check: {sense_check}")
           
           avg_epoch_val_loss = val_loss / len(val_dataloader)
         
