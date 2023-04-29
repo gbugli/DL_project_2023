@@ -480,7 +480,9 @@ class IJEPA_base(nn.Module):
 
         #if mode is test, we get return full embedding:
         if self.mode == 'test':
-            encoding = self.student_encoder(x, B, T, W) # input in format 'b (t h w) m',output in format 'b t (h w) m' (batch frames n_patches embed_dim)
+            B = x.shape[0]
+            T = 11
+            encoding = self.student_encoder(x, B, T, 1) # input in format 'b (t h w) m',output in format 'b t (h w) m' (batch frames n_patches embed_dim)
             encoding = self.norm(encoding)
             b, n, m = encoding.shape
             # encoding = rearrange(encoding, 'b t (h w) m -> b (t h w) m',b=B,t=T,w=W)
@@ -496,11 +498,11 @@ class IJEPA_base(nn.Module):
             
             # target_masks = rearrange(target_masks, 'b t (h w) m -> b (t h w) m',b=B,t=11,w=W)
             encoding = torch.cat((encoding, target_masks), dim=1)
-            return self.predictor(encoding, B, T+11, W) # predict the masked frames
+            return self.predictor(encoding, B, T+11, 1) # predict the masked frames
         
         # #get target embeddings
         # input in format 'b (t h w) m', output in format (1) 'b 11 (h w) m' and (2) 'b t (h w) m'
-        target_blocks, mask_indices = self.get_target_block(self.teacher_encoder,x,B,T,W)
+        target_blocks, mask_indices = self.get_target_block(self.teacher_encoder,x,B,T,1)
 
         #get context embeddings
         context_block = self.get_context_block(x, mask_indices)

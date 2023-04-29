@@ -14,13 +14,13 @@ def resume_training(module_dict, optimizer_dict, resume_ckpt, loss_name_list = N
     for k, m in module_dict.items():
         state_dict = modules_state_dict[k]
         try:
-            m.load_state_dict(state_dict)
+            m.load_state_dict(state_dict, strict=False)
         except RuntimeError: #load the model trained by data distributed parallel
             new_state_dict = OrderedDict()
             for sk, sv in state_dict.items():
                 nk = sk[7:] # remove `module.`
                 new_state_dict[nk] = sv
-                m.load_state_dict(new_state_dict)
+                m.load_state_dict(new_state_dict, strict=False)
                 # try:
                 #     m.load_state_dict(new_state_dict)
                 # except RuntimeError:
