@@ -31,7 +31,6 @@ class ConvLSTMCell(nn.Module):
         
         # Idea adapted from https://github.com/ndrplz/ConvLSTM_pytorch
         X, H_prev, C_prev = X.to(self.device), H_prev.to(self.device), C_prev.to(self.device)
-        print(X.shape)
         conv_output = self.conv(torch.cat([X, H_prev], dim=1))
 
         # Idea adapted from https://github.com/ndrplz/ConvLSTM_pytorch
@@ -47,5 +46,5 @@ class ConvLSTMCell(nn.Module):
 
         # Current Hidden State
         H = output_gate * self.activation(C)
-
+        
         return H, C

@@ -4,7 +4,7 @@ from ConvLSTM import ConvLSTM
 
 class Seq2Seq(nn.Module):
 
-    def __init__(self, num_channels, num_kernels, kernel_size, padding, 
+    def __init__(self, num_channels, pred_frames, num_kernels, kernel_size, padding, 
     activation, frame_size, num_layers, device='mps'):
 
         super().__init__()
@@ -16,7 +16,7 @@ class Seq2Seq(nn.Module):
         self.sequential.add_module(
             "convlstm1", ConvLSTM(
                 in_channels=num_channels, out_channels=num_kernels,
-                kernel_size=kernel_size, padding=padding, 
+                pred_frames = pred_frames, kernel_size=kernel_size, padding=padding, 
                 activation=activation, frame_size=frame_size, device=self.device)
         )
 
@@ -30,7 +30,7 @@ class Seq2Seq(nn.Module):
             self.sequential.add_module(
                 f"convlstm{l}", ConvLSTM(
                     in_channels=num_kernels, out_channels=num_kernels,
-                    kernel_size=kernel_size, padding=padding, 
+                    pred_frames = pred_frames, kernel_size=kernel_size, padding=padding, 
                     activation=activation, frame_size=frame_size, device=self.device)
                 )
                 
@@ -49,6 +49,8 @@ class Seq2Seq(nn.Module):
         print('Shape before seq')
         print(X.shape)
         output = self.sequential(X)
+        print('Shape after sequence')
+        print(output.shape)
 
         # Return only the last output frame
         output = self.conv(output[:,:,-1])
