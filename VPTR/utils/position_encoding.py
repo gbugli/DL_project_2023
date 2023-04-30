@@ -53,7 +53,7 @@ class PositionEmbeddding2D(nn.Module):
     2D position encoding, borrowed from DETR PositionEmbeddingSine class
     https://github.com/facebookresearch/detr/blob/master/models/position_encoding.py
     """
-    def __init__(self, temperature=10000, normalize=False, scale=None, device = torch.device('cuda:0')):
+    def __init__(self, temperature=10000, normalize=False, scale=None, device = torch.device('cuda')):
         super().__init__()
         self.temperature = temperature
         self.normalize = normalize
@@ -97,7 +97,7 @@ class PositionEmbeddding3D(nn.Module):
     """
     3D position encoding
     """
-    def __init__(self, E, T, temperature=10000, normalize=False, scale=None, device = torch.device('cuda:0')):
+    def __init__(self, E, T, temperature=10000, normalize=False, scale=None, device = torch.device('cuda')):
         """
         E: embedding size, i.e. pos feature length
         T: video clip length
