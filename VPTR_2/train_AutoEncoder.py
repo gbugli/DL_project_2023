@@ -107,8 +107,8 @@ if __name__ == '__main__':
     ckpt_save_dir = Path('/scratch/gb2572/DL_project_2023/output/test_autoencoder/models/partial')
     tensorboard_save_dir = Path('/scratch/gb2572/DL_project_2023/output/test_autoencoder/tensorboard')
 
-    # resume_ckpt = ckpt_save_dir.joinpath('epoch_5.tar')
-    resume_ckpt = None
+    resume_ckpt = ckpt_save_dir.joinpath('epoch_11.tar')
+    # resume_ckpt = None
     start_epoch = 0
 
     summary_writer = SummaryWriter(tensorboard_save_dir.absolute().as_posix())
@@ -118,7 +118,7 @@ if __name__ == '__main__':
     img_channels = 3 #3 channels for BAIR datset
     epochs = 50
     N = 2
-    AE_lr = 2e-5
+    AE_lr = 5e-6
     lam_gan = 0.01
     device = torch.device('cuda')
 

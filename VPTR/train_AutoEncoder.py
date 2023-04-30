@@ -104,11 +104,11 @@ def show_samples(VPTR_Enc, VPTR_Dec, sample, save_dir, renorm_transform):
         visualize_batch_clips(past_frames[0:idx, :, ...], rec_future_frames[0:idx, :, ...], rec_past_frames[0:idx, :, ...], save_dir, renorm_transform, desc = 'ae')
 
 if __name__ == '__main__':
-    ckpt_save_dir = Path('/scratch/gb2572/DL_project_2023/output/test_vptr_2/models/partial')
-    tensorboard_save_dir = Path('/scratch/gb2572/DL_project_2023/output/test_vptr_2/tensorboard')
+    ckpt_save_dir = Path('/scratch/gb2572/DL_project_2023/output/test_vptr/models/partial')
+    tensorboard_save_dir = Path('/scratch/gb2572/DL_project_2023/output/test_vptr/tensorboard')
 
-    # resume_ckpt = ckpt_save_dir.joinpath('epoch_3.tar')
-    resume_ckpt = None
+    resume_ckpt = ckpt_save_dir.joinpath('epoch_5.tar')
+    # resume_ckpt = None
     start_epoch = 0
 
     summary_writer = SummaryWriter(tensorboard_save_dir.absolute().as_posix())
@@ -117,7 +117,7 @@ if __name__ == '__main__':
     encH, encW, encC = 6, 6, 528
     img_channels = 3 #3 channels for BAIR datset
     epochs = 50
-    N = 4
+    N = 2
     AE_lr = 2e-5
     lam_gan = 0.01
     device = torch.device('cuda')
@@ -154,10 +154,9 @@ if __name__ == '__main__':
     gdl_loss = GDL(alpha = 1)
 
     if resume_ckpt is not None:
-        loss_dict, start_epoch = resume_training({'VPTR_Enc': VPTR_Enc, 'VPTR_Dec': VPTR_Dec, 'VPTR_Disc': VPTR_Disc}, 
+        start_epoch, loss_dict = resume_training({'VPTR_Enc': VPTR_Enc, 'VPTR_Dec': VPTR_Dec, 'VPTR_Disc': VPTR_Disc}, 
                                                 {'optimizer_G': optimizer_G, 'optimizer_D': optimizer_D}, 
                                                 resume_ckpt, loss_name_list, device)
-
 
     #####################Training loop ###########################                                            
     for epoch in range(start_epoch+1, start_epoch + epochs+1):

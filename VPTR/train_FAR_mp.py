@@ -281,11 +281,11 @@ if __name__ == '__main__':
     set_seed(3407)
     args = parser.parse_args()
 
-    ckpt_save_dir = Path('/scratch/gb2572/DL_project_2023/output/test_NAR/models/partial')
-    tensorboard_save_dir = Path('/scratch/gb2572/DL_project_2023/output/test_NAR/tensorboard')
+    ckpt_save_dir = Path('/scratch/gb2572/DL_project_2023/output/test_FAR/models/partial')
+    tensorboard_save_dir = Path('/scratch/gb2572/DL_project_2023/output/test_FAR/tensorboard')
     resume_AE_ckpt = Path('/scratch/gb2572/DL_project_2023/output/test_vptr/models/partial').joinpath('epoch_4.tar')
 
-    resume_Transformer_ckpt = ckpt_save_dir.joinpath('epoch_12.tar')
+    resume_Transformer_ckpt = ckpt_save_dir.joinpath('epoch_36.tar')
     # resume_Transformer_ckpt = None
 
     data_set_name = 'BAIR'
@@ -299,12 +299,12 @@ if __name__ == '__main__':
     num_future_frames = 11
     encH, encW, encC = 6, 6, 528
     img_channels = 3
-    epochs = 30
+    epochs = 80
     batch_size = 1*4
     num_encoder_layers = 6
 
     #AE_lr = 2e-4
-    Transformer_lr = 1e-4
+    Transformer_lr = 1e-5
     max_grad_norm = 1.0 
     rpe = True
     lam_gan = 0.001
