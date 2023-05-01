@@ -44,6 +44,8 @@ def parse_args() -> Namespace:
     parser.add_argument("--output-dir", help="Name of dir to save the checkpoints to", required=True, type=str)
     parser.add_argument("--run-id", help="Name of the run", required=True, type=str)
     parser.add_argument("--masker-dir", help="Name of dir of masker checkpoint", required=True, type=str)
+    parser.add_argument("--model-dir", help="Name of dir of model checkpoint", required=True, type=str)
+    parser.add_argument("--resume", help="In case training was not completed resume from last epoch", default=False, type=bool)
 
     return parser.parse_args()
 
@@ -120,8 +122,12 @@ def finetune(epoch, model, masker, train_loader, val_loader, criterion, model_op
             masker_optimizer.step()   
 
             train_loss += loss.item()
-            if scheduler is not None:
-                scheduler.step()
+
+            if model_scheduler is not None:
+                model_scheduler.step()
+            
+            if masker_scheduler is not None:
+                masker_scheduler.step()
 
             if idx % 50 == 0 and epoch < 5:
               print(f"Loss on current batch: {loss.item()}") # we can just take a sample, don't need to average it
@@ -253,6 +259,8 @@ if __name__ == "__main__":
 
     # Define LSTM
     model = Seq2Seq(num_channels=49, num_kernels=64, kernel_size=(3, 3), padding=(1, 1), activation="relu", frame_size=(160, 240), num_layers=3, device=device)
+    model_checkpoint = torch.load(args.model-dir, map_location=device)
+    model.load_state_dict(model_checkpoint)
     model.to(device)
 
     masker = Unet_masker = UNet(                 # model input channels (1 for gray-scale images, 3 for RGB, etc.)
