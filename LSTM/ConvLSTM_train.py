@@ -17,7 +17,6 @@ from torch.optim import Adam
 from torch.utils.data import DataLoader
 
 import io
-import imageio
 from ipywidgets import widgets, HBox
 import torch.nn.functional as F
 from torch.utils.data import Dataset
@@ -36,12 +35,18 @@ from early_stop import EarlyStop
 
 from Seq2Seq import Seq2Seq
 
+# # To use config
+# from config import Config
+
+# To use Paths class
+# from utils.file_utils import create_output_dirs, PathsContainer
+
 
 
 def parse_args() -> Namespace:
     parser = ArgumentParser("ConvLSTM")
     # parser.add_argument("--config-file-name", required=True, type=str, help="Name of json file with config")
-    parser.add_argument("--train-dir", help="Name of dir with training data", required=True, type=str)
+    parser.add_argument("--train-dir", help="Name of dir with unlabeled training data", required=True, type=str)
     parser.add_argument("--val-dir", help="Name of dir with validation data", required=True, type=str)
     parser.add_argument("--output-dir", help="Name of dir to save the checkpoints to", required=True, type=str)
     parser.add_argument("--run-id", help="Name of the run", required=True, type=str)
@@ -285,6 +290,21 @@ if __name__ == "__main__":
     os.makedirs(os.path.join(save_dir, "models/best"), exist_ok=True)
     os.makedirs(os.path.join(save_dir, "training_plots"), exist_ok=True)
 
+    # # instead of the above do the following
+    # paths = PathsContainer.from_args(args.output_dir, args.run_id, args.config_file_name)
+    # create_output_dirs(paths.save_dir)
+
+    # if args.resume:
+    #     print("Resuming training...")
+    #     config = Config.from_json(os.path.join(paths.save_dir, 'used_config.json'))
+    #     config_input = Config.from_json(paths.config_path)
+    #     if config_input != config:
+    #         logger.warning("Input config differs from used config: loading used config")
+    # else:
+    #     config = Config.from_json(paths.config_path)
+    #     output_config_path = os.path.join(paths.save_dir, "used_config.json")
+    #     os.system("cp {} {}".format(paths.config_path, output_config_path))
+
     # Parameters (TO DO: Make a config file for all of them)
     num_epochs = 20
     # div_factor = 10 # max_lr/div_factor = initial lr
@@ -299,13 +319,13 @@ if __name__ == "__main__":
     print('Loading val data...')
     val_data_dir  = os.path.join(args.val_dir, 'data')
     val_annotation_dir = os.path.join(args.val_dir, 'annotations.txt')
-    val_dataloader = load_data(val_data_dir, val_annotation_dir, batch_size)
+    dataloader_val = load_data(val_data_dir, val_annotation_dir, batch_size, mask=True)
 
     # Used this approach so that we can get back to training the loaded model from checkpoint
     epoch = 0
 
     # Define LSTM
-    model = Seq2Seq(num_channels=49, num_kernels=64, kernel_size=(3, 3), padding=(1, 1), activation="relu", frame_size=(160, 240), num_layers=3)
+    model = Seq2Seq(num_channels=49, num_kernels=64, kernel_size=(3, 3), padding=(1, 1), activation="relu", frame_size=(160, 240), num_layers=3, device=device)
     model.to(device)
 
     optimizer = AdamW(model.parameters(), lr=1e-4, weight_decay=0.005)
@@ -344,7 +364,7 @@ if __name__ == "__main__":
     model.to(device)
 
     print('Start training model...')
-    results = train(epoch, model, dataset_unlabeled, val_dataloader, criterion, optimizer, scheduler, early_stop, num_epochs, device, save_dir)
+    results = train(epoch, model, dataloader_unlabeled, dataloader_val, criterion, optimizer, scheduler, early_stop, num_epochs, device, save_dir)
 
     print(f'Model training finshed at epoch {results["epochs"]}, trainig loss: {results["train_loss"]}')
 

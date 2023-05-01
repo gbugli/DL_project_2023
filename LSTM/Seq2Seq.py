@@ -4,20 +4,19 @@ from ConvLSTM import ConvLSTM
 
 class Seq2Seq(nn.Module):
 
-    def __init__(self, num_channels, pred_frames, num_kernels, kernel_size, padding, 
-    activation, frame_size, num_layers, device='mps'):
+    def __init__(self, num_channels, num_kernels, kernel_size, padding, 
+    activation, frame_size, num_layers, device='cuda'):
 
-        super().__init__()
+        super(Seq2Seq, self).__init__()
 
-        self.device = device
         self.sequential = nn.Sequential()
 
         # Add First layer (Different in_channels than the rest)
         self.sequential.add_module(
             "convlstm1", ConvLSTM(
                 in_channels=num_channels, out_channels=num_kernels,
-                pred_frames = pred_frames, kernel_size=kernel_size, padding=padding, 
-                activation=activation, frame_size=frame_size, device=self.device)
+                kernel_size=kernel_size, padding=padding, 
+                activation=activation, frame_size=frame_size, device=device)
         )
 
         self.sequential.add_module(
@@ -30,8 +29,8 @@ class Seq2Seq(nn.Module):
             self.sequential.add_module(
                 f"convlstm{l}", ConvLSTM(
                     in_channels=num_kernels, out_channels=num_kernels,
-                    pred_frames = pred_frames, kernel_size=kernel_size, padding=padding, 
-                    activation=activation, frame_size=frame_size, device=self.device)
+                    kernel_size=kernel_size, padding=padding, 
+                    activation=activation, frame_size=frame_size, device=device)
                 )
                 
             self.sequential.add_module(
@@ -40,21 +39,20 @@ class Seq2Seq(nn.Module):
 
         # Add Convolutional Layer to predict output frame
         self.conv = nn.Conv2d(
-            in_channels=num_kernels, out_channels=num_channels,
+            in_channels=num_kernels, out_channels=49,
             kernel_size=kernel_size, padding=padding)
 
     def forward(self, X):
 
+        #print(f"got to beginning: {X.shape}")
         # Forward propagation through all the layers
-        print('Shape before seq')
-        print(X.shape)
         output = self.sequential(X)
-        print('Shape after sequence')
-        print(output.shape)
+
+        #print(f"got to middle: {output.shape}")
 
         # Return only the last output frame
         output = self.conv(output[:,:,-1])
         
-        return nn.Sigmoid()(output)
+        return output
 
     

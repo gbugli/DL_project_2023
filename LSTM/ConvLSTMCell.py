@@ -5,11 +5,10 @@ import torch.nn as nn
 class ConvLSTMCell(nn.Module):
 
     def __init__(self, in_channels, out_channels, 
-    kernel_size, padding, activation, frame_size, device):
+    kernel_size, padding, activation, frame_size):
 
-        super().__init__()  
+        super(ConvLSTMCell, self).__init__()  
 
-        self.device = device
         if activation == "tanh":
             self.activation = torch.tanh 
         elif activation == "relu":
@@ -28,9 +27,8 @@ class ConvLSTMCell(nn.Module):
         self.W_cf = nn.Parameter(torch.Tensor(out_channels, *frame_size))
 
     def forward(self, X, H_prev, C_prev):
-        
+
         # Idea adapted from https://github.com/ndrplz/ConvLSTM_pytorch
-        X, H_prev, C_prev = X.to(self.device), H_prev.to(self.device), C_prev.to(self.device)
         conv_output = self.conv(torch.cat([X, H_prev], dim=1))
 
         # Idea adapted from https://github.com/ndrplz/ConvLSTM_pytorch
@@ -46,5 +44,5 @@ class ConvLSTMCell(nn.Module):
 
         # Current Hidden State
         H = output_gate * self.activation(C)
-        
+
         return H, C
