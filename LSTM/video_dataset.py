@@ -3,6 +3,7 @@ import os.path
 import numpy as np
 from PIL import Image
 from torchvision import transforms
+from torch.utils.data import Dataset
 import torch
 from typing import List, Union, Tuple, Any
 
@@ -275,3 +276,18 @@ class ImglistToTensor(torch.nn.Module):
             tensor of size ``NUM_IMAGES x CHANNELS x HEIGHT x WIDTH``
         """
         return torch.stack([transforms.functional.to_tensor(pic) for pic in img_list])
+    
+
+class MaskDataset(Dataset):
+    def __init__(self, save_dir='output_masks'):
+        self.save_dir = save_dir
+        self.files = sorted([f for f in os.listdir(save_dir) if f.startswith('mask_') and f.endswith('.pt')])
+
+    def __len__(self):
+        return len(self.files)
+
+    def __getitem__(self, idx):
+        mask_path = os.path.join(self.save_dir, self.files[idx])
+        mask = torch.load(mask_path)
+        #label = torch.tensor(0)  # Dummy label; replace with actual labels if needed
+        return mask.unsqueeze(0) #, label
