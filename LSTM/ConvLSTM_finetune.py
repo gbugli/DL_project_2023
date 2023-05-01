@@ -301,9 +301,9 @@ if __name__ == "__main__":
                 masker_scheduler.load_state_dict(checkpoint['masker_scheduler_state_dict'])
             epoch = checkpoint['epoch']
             early_stop = checkpoint['early_stop']
-            print(f'Resuming training from epoch {epoch}')
+            print(f'Resuming finetuning from epoch {epoch}')
         except :
-            print("Couldn't load model from checkpoint, starting again training from epoch 0")
+            print("Couldn't load model from checkpoint, starting again finetuning from epoch 0")
     
     # Pass model to DataParallel (Could improve by using DistributedDataParallel)
     if torch.cuda.device_count() > 1:
