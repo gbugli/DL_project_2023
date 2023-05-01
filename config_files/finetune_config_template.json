@@ -29,14 +29,6 @@
         "name": <str, name of the LR scheduler as in torch.optim.lr_scheduler>,
         "args": <dict, arguments of the LR scheduler>
     },
-    "masker_optimizer": {
-        "name": <str, name of the optimizer as in torch.optim>,
-        "args": <dict, arguments of the optimizer>
-    },
-    "masker_lr_scheduler": {
-        "name": <str, name of the LR scheduler as in torch.optim.lr_scheduler>,
-        "args": <dict, arguments of the LR scheduler>
-    },
     "criterion": {
         "name": <str, name of the LR scheduler as in torch.optim.lr_scheduler>,
         "background_weight": <float, weight of the background class>

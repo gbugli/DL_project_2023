@@ -35,6 +35,8 @@ from early_stop import EarlyStop
 
 from Seq2Seq import Seq2Seq
 
+from losses import CEandDiceLoss
+
 # # To use config
 # from config import Config
 
@@ -263,7 +265,7 @@ def plot_model_result(pred, actual, output_dir, fig_name='example'):
     """
     num_frames = len(pred)
     fig, ax = plt.subplots(2, num_frames, figsize = (num_frames*2, 4))
-    fig.subplots_adjust(wspace=0.1, hspace = 0.4)
+    fig.subplots_adjust(wspace=0.01, hspace = 0.1)
 
     for j in range(num_frames):
       ax[0,j].set_axis_off()
@@ -309,7 +311,7 @@ if __name__ == "__main__":
     num_epochs = 30
     # div_factor = 10 # max_lr/div_factor = initial lr
     # final_div_factor = 100 # final lr is initial_lr/final_div_factor 
-    batch_size = 8
+    batch_size = 4
     patience = 15
 
     print('Loading train data...')
@@ -325,7 +327,7 @@ if __name__ == "__main__":
     epoch = 0
 
     # Define LSTM
-    model = Seq2Seq(num_channels=49, num_kernels=64, kernel_size=(3, 3), padding=(1, 1), activation="relu", frame_size=(160, 240), num_layers=5, device=device)
+    model = Seq2Seq(num_channels=49, num_kernels=128, kernel_size=(3, 3), padding=(1, 1), activation="relu", frame_size=(160, 240), num_layers=4, device=device)
     model.to(device)
 
     optimizer = AdamW(model.parameters(), lr=5e-5, weight_decay=0.005)
@@ -335,10 +337,11 @@ if __name__ == "__main__":
 
 
     class_weights = torch.ones(49)
-    class_weights[0] = 0.7
+    class_weights[0] = 0.5
     class_weights = class_weights.to(device)
 
-    criterion = nn.CrossEntropyLoss(weight=class_weights)
+    # criterion = nn.CrossEntropyLoss(weight=class_weights)
+    criterion = CEandDiceLoss(class_weights, 0.3, 0.7)
 
     early_stop = EarlyStop(patience)
 

@@ -1,0 +1,59 @@
+{
+    "lstm_model": {
+        "num_channels": 49,
+        "num_kernels": 64,
+        "kernel_size": [3,3],
+        "padding": [1,1],
+        "activation": "relu",
+        "frame_size": [160,240],
+        "num_layers": 5
+    },
+    "masker_model": {
+        "n_class": 49
+    },
+    "data": {
+        "train": {
+            "path": "/train",
+            "batch_size": 2
+        }, 
+        "val": {
+            "path": "/val",
+            "batch_size": 2
+        }
+    },
+    "lstm_optimizer": {
+        "name": "AdamW",
+        "args": {
+                "lr":1e-6, 
+                "weight_decay": 0.005
+        }
+    },
+    "lstm_lr_scheduler": {
+        "name": "CosineAnnealingLR",
+        "args": {
+                "eta_min": 1e-8
+        }
+    },
+    "masker_optimizer": {
+        "name": "AdamW",
+        "args": {
+                "lr":5e-5, 
+                "weight_decay": 0.005
+        }
+    },
+    "masker_lr_scheduler": {
+        "name": "CosineAnnealingLR",
+        "args": {
+                "eta_min": 1e-8
+        }
+    },
+    "criterion": {
+        "name": "CrossEntropyLoss",
+        "background_weight": 0.5,
+        "args": {}
+    },
+    "training": {
+        "epochs": 20,
+        "early_stopping_patience": 15
+    }
+  }

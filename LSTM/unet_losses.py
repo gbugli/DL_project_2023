@@ -5,7 +5,7 @@ class CEandDiceLoss(nn.Module):
         super(CEandDiceLoss, self).__init__()
         self.ce_weight = ce_weight
         self.dice_weight = dice_weight
-        self.ce_loss = nn.CrossEntropyLoss()
+        self.ce_loss = nn.CrossEntropyLoss(ce_class_weights)
         self.dice_loss = smp.losses.DiceLoss(mode="multiclass")
     
     def forward(self, pred, target):

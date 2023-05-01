@@ -37,6 +37,7 @@ from early_stop import EarlyStop
 
 from Seq2Seq import Seq2Seq
 from UNet_pretraining import UNet
+from losses import CEandDiceLoss
 
 # To use config
 from config import FineTuneConfig
@@ -49,8 +50,8 @@ from utils.file_utils import create_output_dirs, PathsContainer
 def parse_args() -> Namespace:
     parser = ArgumentParser("ConvLSTM")
     parser.add_argument("--config-file-name", required=True, type=str, help="Name of json file with config")
-    parser.add_argument("--train-dir", help="Name of dir with labeled training data", required=True, type=str)
-    parser.add_argument("--val-dir", help="Name of dir with validation data", required=True, type=str)
+    # parser.add_argument("--train-dir", help="Name of dir with labeled training data", required=True, type=str)
+    # parser.add_argument("--val-dir", help="Name of dir with validation data", required=True, type=str)
     parser.add_argument("--output-dir", help="Name of dir to save the checkpoints to", required=True, type=str)
     parser.add_argument("--run-id", help="Name of the run", required=True, type=str)
     parser.add_argument("--masker-dir", help="Name of dir of masker checkpoint", required=True, type=str)
@@ -95,49 +96,74 @@ def one_hot_encoding(input_tensor, num_classes=49):
     return one_hot
 
 
-def finetune(epoch, model, masker, train_loader, val_loader, criterion, model_optimizer, masker_optimizer, model_scheduler, masker_scheduler, early_stop, num_epochs, device, output_dir):
+def finetune(epoch, model, masker, train_loader, val_loader, criterion, model_optimizer, model_scheduler, early_stop, num_epochs, device, output_dir):
 
     while epoch < num_epochs:
-        print(f'Starting epoch {epoch + 1}')
+        print(f'Starting epoch {epoch}')
         start_time = time.time()
         model.train()
+        masker.eval()
         train_loss = 0                                            
         # pbar = tqdm(enumerate(dataloader), total=len(dataloader))
         for idx, data in enumerate(train_loader):
             frames, labels, masks = data
             frames, labels, masks = frames.to(device), labels.to(device), masks.to(device)
 
-            B = frame.shape[0]
+            B = frames.shape[0]
 
             model_optimizer.zero_grad()
-            masker_optimizer.zero_grad()
 
             frames = rearrange(frames, 'b t c h w -> (b t) c h w')
-            masks = rearrange(masks, 'b t h w -> (b t) h w')
-            
+            # masks = rearrange(masks, 'b t h w -> (b t) h w')
+
             gen_masks = masker(frames)
+            gen_masks = torch.argmax(gen_masks, dim=1)
             gen_masks = rearrange(gen_masks, '(b t) h w -> b t h w', b=B)
 
-            rand = np.random.randint(11,21)
-            input = gen_masks[:,rand-11:rand, :, :]
-            target_mask = masks[:,rand,:,:]
-            input = one_hot_encoding(input, 49)   
+            # Fine-tune on predicting the 22nd frame
+            context = one_hot_encoding(gen_masks[:,:11], 49)
 
-            output = model(input)
+            for frame in range(11):
+                    
+                pred = model(context)
+
+                loss = criterion(pred, masks[:, 11 + frame].long())
+                loss.backward()
+
+                model_optimizer.step()
+
+                train_loss += loss.item()
+
+                pred = torch.argmax(pred, dim=1)
+                pred = one_hot_encoding(pred.unsqueeze(1))
+                context = context[:,:,-10:]
+                context = torch.cat([context, pred], dim=2)
+
+                # if frame != 10:
+                #     pred = torch.argmax(pred, dim=1)
+                #     pred = one_hot_encoding(pred.unsqueeze(1))
+                #     context = context[:,:,-10:]
+                #     context = torch.cat([context, pred], dim=2)
+
+            # target = masks[:,-1]
+            # loss = criterion(pred, target.long())
+
+            # rand = np.random.randint(11,21)
+            # input = gen_masks[:,rand-11:rand, :, :]
+            # target_mask = masks[:,rand,:,:]
+            # input = one_hot_encoding(input, 49)   
+
+            # output = model(input)
                                         
-            loss = criterion(output, target_mask)       
-            loss.backward()      
+            # loss = criterion(output, target_mask.long())       
+            # loss.backward()      
 
-            model_optimizer.step()
-            masker_optimizer.step()   
+            # model_optimizer.step()
 
-            train_loss += loss.item()
+            # train_loss += loss.item()
 
             if model_scheduler is not None:
                 model_scheduler.step()
-            
-            if masker_scheduler is not None:
-                masker_scheduler.step()
 
             if idx % 50 == 0 and epoch < 5:
               print(f"Loss on current batch: {loss.item()}") # we can just take a sample, don't need to average it
@@ -191,7 +217,7 @@ def finetune(epoch, model, masker, train_loader, val_loader, criterion, model_op
         print(f"Epoch: {epoch}, Time for training epoch {end_time - start_time}, Average epoch loss: {avg_epoch_loss:.4f}, Average epoch val loss: {avg_epoch_val_loss:.4f}, Jaccard Score: {jaccard}")
 
         plot_dir = os.path.join(output_dir, 'training_plots')
-        plot_model_example(output[0], masks[0], plot_dir, f'example_epoch_{epoch}')
+        plot_model_example(pred[0, 0], masks[0, 0], plot_dir, f'example_epoch_{epoch}')
         plot_model_result(predicted_masks_show, actual_masks_show, plot_dir, f'predictions_12_to_22_epoch_{epoch}')
 
         # Early Stopping
@@ -216,9 +242,7 @@ def finetune(epoch, model, masker, train_loader, val_loader, criterion, model_op
             'model_state_dict': model.module.state_dict() if torch.cuda.device_count() > 1 else model.state_dict(),
             'masker_state_dict': masker.module.state_dict() if torch.cuda.device_count() > 1 else masker.state_dict(),
             'model_optimizer_state_dict': model_optimizer.state_dict(),
-            'masker_optimizer_state_dict': masker_optimizer.state_dict(),
             'model_scheduler_state_dict': model_scheduler.state_dict() if model_scheduler is not None else None,
-            'masker_scheduler_state_dict': masker_scheduler.state_dict() if masker_scheduler is not None else None,
             'early_stop': early_stop,
             }, os.path.join(output_dir, 'models/partial', "checkpoint.pkl"))
 
@@ -248,7 +272,7 @@ def plot_model_result(pred, actual, output_dir, fig_name='example'):
     """
     num_frames = len(pred)
     fig, ax = plt.subplots(2, num_frames, figsize = (num_frames*2, 4))
-    fig.subplots_adjust(wspace=0.001, hspace = 0.2)
+    fig.subplots_adjust(wspace=0.01, hspace = 0.1)
 
     for j in range(num_frames):
       ax[0,j].set_axis_off()
@@ -293,13 +317,13 @@ if __name__ == "__main__":
     num_epochs = config.training.epochs
 
     print('Loading train data...')
-    train_data_dir  = os.path.join(args.train_dir, 'data')
-    train_annotation_dir = os.path.join(args.train_dir, 'annotations.txt')
+    train_data_dir  = os.path.join(config.data.train.path, 'data')
+    train_annotation_dir = os.path.join(config.data.train.path, 'annotations.txt')
     dataloader_train = load_data(train_data_dir, train_annotation_dir, config.data.train.batch_size, mask=True)
 
     print('Loading val data...')
-    val_data_dir  = os.path.join(args.val_dir, 'data')
-    val_annotation_dir = os.path.join(args.val_dir, 'annotations.txt')
+    val_data_dir  = os.path.join(config.data.val.path, 'data')
+    val_annotation_dir = os.path.join(config.data.val.path, 'annotations.txt')
     dataloader_val = load_data(val_data_dir, val_annotation_dir, config.data.val.batch_size, mask=True)
 
     epoch = 0
@@ -308,6 +332,7 @@ if __name__ == "__main__":
     model_checkpoint = torch.load(args.model_dir, map_location=device)
     model.load_state_dict(model_checkpoint)
     model.to(device)
+    print('LSTM Loaded.')
 
     masker = Unet_masker = UNet(                 # model input channels (1 for gray-scale images, 3 for RGB, etc.)
         n_class=config.masker_model.n_class,                      # model output channels (number of classes in your dataset)
@@ -315,20 +340,22 @@ if __name__ == "__main__":
     unet_checkpoint = torch.load(args.masker_dir, map_location=device)
     masker.load_state_dict(unet_checkpoint)
     masker.to(device)
+    print('UNet Loaded.')
 
     model_optimizer = getattr(optim, config.lstm_optimizer.name)(params=model.parameters(), **config.lstm_optimizer.args)
-    masker_optimizer = getattr(optim, config.masker_optimizer.name)(params=masker.parameters(), **config.masker_optimizer.args)
 
     total_steps = num_epochs * len(dataloader_train)
 
     model_scheduler = getattr(optim.lr_scheduler, config.lstm_lr_scheduler.name)(model_optimizer, T_max=total_steps, **config.lstm_lr_scheduler.args)
-    masker_scheduler = getattr(optim.lr_scheduler, config.masker_lr_scheduler.name)(masker_optimizer, T_max=total_steps, **config.masker_lr_scheduler.args)
 
     class_weights = torch.ones(config.masker_model.n_class)
     class_weights[0] = config.criterion.background_weight
     class_weights = class_weights.to(device)
 
     criterion = getattr(nn, config.criterion.name)(weight=class_weights, **config.criterion.args)
+    # TO DO: make the config such that custom lossess can be used
+    # criterion = CEandDiceLoss(class_weights, 0.3, 0.7)
+    criterion.to(device)
 
     early_stop = EarlyStop(config.training.early_stopping_patience)
 
@@ -389,11 +416,8 @@ if __name__ == "__main__":
             model.load_state_dict(checkpoint['model_state_dict'])
             masker.load_state_dict(checkpoint['masker_state_dict'])
             model_optimizer.load_state_dict(checkpoint['model_optimizer_state_dict'])
-            masker_optimizer.load_state_dict(checkpoint['masker_optimizer_state_dict'])
             if model_scheduler is not None:
                 model_scheduler.load_state_dict(checkpoint['model_scheduler_state_dict'])
-            if masker_scheduler is not None:
-                masker_scheduler.load_state_dict(checkpoint['masker_scheduler_state_dict'])
             epoch = checkpoint['epoch']
             early_stop = checkpoint['early_stop']
             print(f'Resuming finetuning from epoch {epoch}')
@@ -404,10 +428,13 @@ if __name__ == "__main__":
     if torch.cuda.device_count() > 1:
         print("Model training will be distributed to {} GPUs.".format(torch.cuda.device_count()))
         model = nn.DataParallel(model)
+        masker = nn.DataParallel(masker)
     model.to(device)
+    masker.to(device)
+
 
     print('Start finetuning model...')
-    results = finetune(epoch, model, masker, dataloader_train, dataloader_val, criterion, model_optimizer, masker_optimizer, model_scheduler, masker_scheduler, early_stop, num_epochs, device, paths.save_dir)
+    results = finetune(epoch, model, masker, dataloader_train, dataloader_val, criterion, model_optimizer, model_scheduler, early_stop, num_epochs, device, paths.save_dir)
 
     print(f'Model finetuning finshed at epoch {results["epochs"]}, trainig loss: {results["train_loss"]}')
 
