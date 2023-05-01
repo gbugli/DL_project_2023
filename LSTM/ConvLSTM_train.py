@@ -110,7 +110,7 @@ def one_hot_encoding(input_tensor, num_classes=49):
 def train(epoch, model, train_loader, val_loader, criterion, optimizer, scheduler, early_stop, num_epochs, device, output_dir):
 
     while epoch < num_epochs:
-        print(f'Starting epoch {epoch + 1}')
+        print(f'Starting epoch {epoch}')
         start_time = time.time()
         model.train()
         train_loss = 0                                            
@@ -223,22 +223,22 @@ def validate_model(model, valloader, index_to_show):
             input, label, masks = data
             input, label, masks = input.to(device), label.to(device), masks.to(device)
 
-        if batch_num == index_to_show:
-            actual_masks_show = masks[0,11:].cpu()
-
-        context = one_hot_encoding(masks[:,:11], 49)
-        for frame in range(11):
-            pred = model(context)
-            pred = torch.argmax(pred, dim=1)
-            if frame == 10:
-                predicted_masks_22.append(pred[:].cpu())
-                actual_masks_22.append(masks[:,21].cpu())
             if batch_num == index_to_show:
-                predicted_masks_show.append(pred[0].cpu())
-            
-            pred = one_hot_encoding(pred.unsqueeze(1))
-            context = context[:,:,-10:]
-            context = torch.cat([context, pred], dim=2)
+                actual_masks_show = masks[0,11:].cpu()
+
+            context = one_hot_encoding(masks[:,:11], 49)
+            for frame in range(11):
+                pred = model(context)
+                pred = torch.argmax(pred, dim=1)
+                if frame == 10:
+                    predicted_masks_22.append(pred[:].cpu())
+                    actual_masks_22.append(masks[:,21].cpu())
+                if batch_num == index_to_show:
+                    predicted_masks_show.append(pred[0].cpu())
+                
+                pred = one_hot_encoding(pred.unsqueeze(1))
+                context = context[:,:,-10:]
+                context = torch.cat([context, pred], dim=2)
         
         predicted_masks_22 = torch.cat(predicted_masks_22, dim=0)
         actual_masks_22 = torch.cat(actual_masks_22, dim=0)
@@ -253,7 +253,7 @@ def plot_model_example(prediction, target, output_dir, fig_name='example'):
     ax1.imshow(prediction.cpu().numpy())
     ax1.set_title("Predicted Next Frame Mask")
     ax2.imshow(target.cpu().numpy())
-    ax2.set_title("Actual Next Frma Mask")
+    ax2.set_title("Actual Next Frame Mask")
     plt.savefig(f'{output_dir}/{fig_name}.pdf')
 
 
@@ -262,7 +262,7 @@ def plot_model_result(pred, actual, output_dir, fig_name='example'):
     Plot and save figure
     """
     num_frames = len(pred)
-    fig, ax = plt.subplots(2, num_frames, figsize = (num_frames, 1))
+    fig, ax = plt.subplots(2, num_frames, figsize = (num_frames*2, 4))
     fig.subplots_adjust(wspace=0.1, hspace = 0.4)
 
     for j in range(num_frames):
@@ -306,7 +306,7 @@ if __name__ == "__main__":
     #     os.system("cp {} {}".format(paths.config_path, output_config_path))
 
     # Parameters (TO DO: Make a config file for all of them)
-    num_epochs = 20
+    num_epochs = 30
     # div_factor = 10 # max_lr/div_factor = initial lr
     # final_div_factor = 100 # final lr is initial_lr/final_div_factor 
     batch_size = 8
@@ -325,22 +325,22 @@ if __name__ == "__main__":
     epoch = 0
 
     # Define LSTM
-    model = Seq2Seq(num_channels=49, num_kernels=64, kernel_size=(3, 3), padding=(1, 1), activation="relu", frame_size=(160, 240), num_layers=3, device=device)
+    model = Seq2Seq(num_channels=49, num_kernels=64, kernel_size=(3, 3), padding=(1, 1), activation="relu", frame_size=(160, 240), num_layers=5, device=device)
     model.to(device)
 
-    optimizer = AdamW(model.parameters(), lr=1e-4, weight_decay=0.005)
+    optimizer = AdamW(model.parameters(), lr=5e-5, weight_decay=0.005)
 
     total_steps = num_epochs * len(dataloader_unlabeled)
     scheduler = CosineAnnealingLR(optimizer, T_max=total_steps, eta_min=1e-8)
 
 
     class_weights = torch.ones(49)
-    class_weights[0] = 0.5
+    class_weights[0] = 0.7
     class_weights = class_weights.to(device)
 
     criterion = nn.CrossEntropyLoss(weight=class_weights)
 
-    early_stop = EarlyStop(patience, loss=True)
+    early_stop = EarlyStop(patience)
 
     if args.resume:
         print("Attempting to find existing checkpoint")
@@ -367,4 +367,8 @@ if __name__ == "__main__":
     results = train(epoch, model, dataloader_unlabeled, dataloader_val, criterion, optimizer, scheduler, early_stop, num_epochs, device, save_dir)
 
     print(f'Model training finshed at epoch {results["epochs"]}, trainig loss: {results["train_loss"]}')
+
+    # print('Evaluating model...')
+    # pred, actual = validate_model(model, dataloader_val, 10)
+    # plot_model_result(pred, actual, save_dir + '/training_plots', fig_name='example_19_epochs')
 

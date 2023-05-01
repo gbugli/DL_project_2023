@@ -7,9 +7,11 @@ import torch
 from typing import List, Union, Tuple, Any
 
 import time
+import random
 
 import torch
 import torch.nn as nn
+from torch import optim
 
 import numpy as np
 import torch.nn as nn
@@ -36,9 +38,17 @@ from early_stop import EarlyStop
 from Seq2Seq import Seq2Seq
 from UNet_pretraining import UNet
 
+# To use config
+from config import FineTuneConfig
+from attr import asdict
+from functools import partial
+
+# To use Paths class
+from utils.file_utils import create_output_dirs, PathsContainer
+
 def parse_args() -> Namespace:
     parser = ArgumentParser("ConvLSTM")
-    # parser.add_argument("--config-file-name", required=True, type=str, help="Name of json file with config")
+    parser.add_argument("--config-file-name", required=True, type=str, help="Name of json file with config")
     parser.add_argument("--train-dir", help="Name of dir with labeled training data", required=True, type=str)
     parser.add_argument("--val-dir", help="Name of dir with validation data", required=True, type=str)
     parser.add_argument("--output-dir", help="Name of dir to save the checkpoints to", required=True, type=str)
@@ -138,6 +148,9 @@ def finetune(epoch, model, masker, train_loader, val_loader, criterion, model_op
         model.eval()
         predicted_masks_22 = []
         actual_masks_22 = []
+        predicted_masks_show = []
+        show_idx = random.randint(0, len(val_loader))
+
         val_loss = 0
         #valbar = tqdm(enumerate(valloader), total=len(valloader))
         with torch.no_grad():
@@ -146,6 +159,9 @@ def finetune(epoch, model, masker, train_loader, val_loader, criterion, model_op
                 input, label, masks = input.to(device), label.to(device), masks.to(device)
 
                 context = one_hot_encoding(masks[:,:11], 49)
+
+                if idx == show_idx:
+                    actual_masks_show = masks[0,11:].cpu()
                 for frame in range(11):
                     pred = model(context)
 
@@ -154,6 +170,9 @@ def finetune(epoch, model, masker, train_loader, val_loader, criterion, model_op
                         val_loss += loss.item()
 
                     pred = torch.argmax(pred, dim=1)
+
+                    if idx == show_idx:
+                        predicted_masks_show.append(pred[0].cpu())
                     
                     if frame == 10:
                         predicted_masks_22.append(pred.cpu())
@@ -172,17 +191,18 @@ def finetune(epoch, model, masker, train_loader, val_loader, criterion, model_op
         print(f"Epoch: {epoch}, Time for training epoch {end_time - start_time}, Average epoch loss: {avg_epoch_loss:.4f}, Average epoch val loss: {avg_epoch_val_loss:.4f}, Jaccard Score: {jaccard}")
 
         plot_dir = os.path.join(output_dir, 'training_plots')
-        plot_model_example(output[0], target[0], plot_dir, f'example_epoch_{epoch}')
+        plot_model_example(output[0], masks[0], plot_dir, f'example_epoch_{epoch}')
+        plot_model_result(predicted_masks_show, actual_masks_show, plot_dir, f'predictions_12_to_22_epoch_{epoch}')
 
         # Early Stopping
         if jaccard > early_stop.best_value:
-            torch.save(model.module.state_dict() if torch.cuda.device_count() > 1 else model.state_dict(), os.path.join(output_dir, 'finetune/best',"best_model.pkl"))
-            torch.save(masker.module.state_dict() if torch.cuda.device_count() > 1 else masker.state_dict(), os.path.join(output_dir, 'finetune/best',"best_masker.pkl"))
+            torch.save(model.module.state_dict() if torch.cuda.device_count() > 1 else model.state_dict(), os.path.join(output_dir, 'models/best',"best_model.pkl"))
+            torch.save(masker.module.state_dict() if torch.cuda.device_count() > 1 else masker.state_dict(), os.path.join(output_dir, 'models/best',"best_masker.pkl"))
 
         early_stop.step(jaccard, epoch)
         if early_stop.stop_training(epoch):
             print(
-                "early stopping at epoch {} since valdiation loss didn't improve from epoch no {}. Best value {}, current value {}".format(
+                "early stopping at epoch {} since valdiation loss didn't improve from epoch no {}. Best jaccard {}, current jaccard {}".format(
                     epoch, early_stop.best_epoch, early_stop.best_value, jaccard
                 ))
             break
@@ -194,19 +214,52 @@ def finetune(epoch, model, masker, train_loader, val_loader, criterion, model_op
         torch.save({
             'epoch': epoch,
             'model_state_dict': model.module.state_dict() if torch.cuda.device_count() > 1 else model.state_dict(),
-            'masker_state_dict': masker.module.state_dict() if torch.cuda.device_count() > 1 else model.state_dict(),
+            'masker_state_dict': masker.module.state_dict() if torch.cuda.device_count() > 1 else masker.state_dict(),
             'model_optimizer_state_dict': model_optimizer.state_dict(),
             'masker_optimizer_state_dict': masker_optimizer.state_dict(),
             'model_scheduler_state_dict': model_scheduler.state_dict() if model_scheduler is not None else None,
             'masker_scheduler_state_dict': masker_scheduler.state_dict() if masker_scheduler is not None else None,
             'early_stop': early_stop,
-            }, os.path.join(output_dir, 'finetune/partial', "checkpoint.pkl"))
+            }, os.path.join(output_dir, 'models/partial', "checkpoint.pkl"))
 
     return {
         "epochs": epoch,
-        "train_loss": train_loss,
-        "model": model
+        "train_loss": train_loss
             }
+
+def compute_jaccard(ground_truth_mask, predicted_mask):
+    jaccard = torchmetrics.JaccardIndex(task="multiclass", num_classes=49) #.to(device)
+    return jaccard(torch.Tensor(ground_truth_mask), torch.Tensor(predicted_mask))
+
+
+def plot_model_example(prediction, target, output_dir, fig_name='example'):
+    prediction = torch.argmax(prediction, dim=0)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
+    ax1.imshow(prediction.cpu().numpy())
+    ax1.set_title("Predicted Next Frame Mask")
+    ax2.imshow(target.cpu().numpy())
+    ax2.set_title("Actual Next Frame Mask")
+    plt.savefig(f'{output_dir}/{fig_name}.pdf')
+
+
+def plot_model_result(pred, actual, output_dir, fig_name='example'):
+    """
+    Plot and save figure
+    """
+    num_frames = len(pred)
+    fig, ax = plt.subplots(2, num_frames, figsize = (num_frames*2, 4))
+    fig.subplots_adjust(wspace=0.001, hspace = 0.2)
+
+    for j in range(num_frames):
+      ax[0,j].set_axis_off()
+      ax[1,j].set_axis_off()
+      
+      img_pred = pred[j]
+      img_actual = actual[j]
+
+      ax[0,j].imshow(img_pred)
+      ax[1,j].imshow(img_actual)
+    fig.savefig(f'{output_dir}/{fig_name}.pdf', bbox_inches = 'tight')
 
 
 if __name__ == "__main__":
@@ -216,79 +269,121 @@ if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Create all the paths to save models and files if don't already exist
-    save_dir = os.path.join(args.output-dir,args.run_id)
-    os.makedirs(save_dir, exist_ok=True)
-    os.makedirs(os.path.join(save_dir, "finetune/partial"), exist_ok=True)
-    os.makedirs(os.path.join(save_dir, "finetune/best"), exist_ok=True)
+    # save_dir = os.path.join(args.output-dir,args.run_id)
+    # os.makedirs(save_dir, exist_ok=True)
+    # os.makedirs(os.path.join(save_dir, "finetune/partial"), exist_ok=True)
+    # os.makedirs(os.path.join(save_dir, "finetune/best"), exist_ok=True)
     # os.makedirs(os.path.join(save_dir, "training_plots"), exist_ok=True)
 
     # # instead of the above do the following
-    # paths = PathsContainer.from_args(args.output_dir, args.run_id, args.config_file_name)
-    # create_output_dirs(paths.save_dir)
+    paths = PathsContainer.from_args(args.output_dir, args.run_id, args.config_file_name)
+    create_output_dirs(paths.save_dir)
 
-    # if args.resume:
-    #     print("Resuming training...")
-    #     config = Config.from_json(os.path.join(paths.save_dir, 'used_config.json'))
-    #     config_input = Config.from_json(paths.config_path)
-    #     if config_input != config:
-    #         logger.warning("Input config differs from used config: loading used config")
-    # else:
-    #     config = Config.from_json(paths.config_path)
-    #     output_config_path = os.path.join(paths.save_dir, "used_config.json")
-    #     os.system("cp {} {}".format(paths.config_path, output_config_path))
+    if args.resume:
+        print("Resuming training...")
+        config = FineTuneConfig.from_json(os.path.join(paths.save_dir, 'used_config.json'))
+        config_input = FineTuneConfig.from_json(paths.config_path)
+        if config_input != config:
+            print("Input config differs from used config: loading used config")
+    else:
+        config = FineTuneConfig.from_json(paths.config_path)
+        output_config_path = os.path.join(paths.save_dir, "used_config.json")
+        os.system("cp {} {}".format(paths.config_path, output_config_path))
 
-    # Parameters (TO DO: Make a config file for all of them)
-    num_epochs = 20
-    # div_factor = 10 # max_lr/div_factor = initial lr
-    # final_div_factor = 100 # final lr is initial_lr/final_div_factor 
-    batch_size = 8
-    patience = 15
+    num_epochs = config.training.epochs
 
     print('Loading train data...')
-    train_data_dir  = os.path.join(args.train-dir, 'data')
-    train_annotation_dir = os.path.join(args.train-dir, 'annotations.txt')
-    dataloader_train = load_data(train_data_dir, train_annotation_dir, batch_size, mask=True)
+    train_data_dir  = os.path.join(args.train_dir, 'data')
+    train_annotation_dir = os.path.join(args.train_dir, 'annotations.txt')
+    dataloader_train = load_data(train_data_dir, train_annotation_dir, config.data.train.batch_size, mask=True)
 
     print('Loading val data...')
-    val_data_dir  = os.path.join(args.val-dir, 'data')
-    val_annotation_dir = os.path.join(args.val-dir, 'annotations.txt')
-    dataloader_val = load_data(val_data_dir, val_annotation_dir, batch_size, mask=True)
+    val_data_dir  = os.path.join(args.val_dir, 'data')
+    val_annotation_dir = os.path.join(args.val_dir, 'annotations.txt')
+    dataloader_val = load_data(val_data_dir, val_annotation_dir, config.data.val.batch_size, mask=True)
 
-    # Used this approach so that we can get back to training the loaded model from checkpoint
     epoch = 0
 
-    # Define LSTM
-    model = Seq2Seq(num_channels=49, num_kernels=64, kernel_size=(3, 3), padding=(1, 1), activation="relu", frame_size=(160, 240), num_layers=3, device=device)
-    model_checkpoint = torch.load(args.model-dir, map_location=device)
+    model = Seq2Seq(**asdict(config.lstm_model, recurse=False), device=device)
+    model_checkpoint = torch.load(args.model_dir, map_location=device)
     model.load_state_dict(model_checkpoint)
     model.to(device)
 
     masker = Unet_masker = UNet(                 # model input channels (1 for gray-scale images, 3 for RGB, etc.)
-        n_class=49,                      # model output channels (number of classes in your dataset)
+        n_class=config.masker_model.n_class,                      # model output channels (number of classes in your dataset)
     )
-    unet_checkpoint = torch.load(args.masker-dir, map_location=device)
+    unet_checkpoint = torch.load(args.masker_dir, map_location=device)
     masker.load_state_dict(unet_checkpoint)
     masker.to(device)
 
-    model_optimizer = AdamW(model.parameters(), lr=1e-4, weight_decay=0.005)
-    masker_optimizer = AdamW(masker.parameters(), lr=1e-4, weight_decay=0.005)
+    model_optimizer = getattr(optim, config.lstm_optimizer.name)(params=model.parameters(), **config.lstm_optimizer.args)
+    masker_optimizer = getattr(optim, config.masker_optimizer.name)(params=masker.parameters(), **config.masker_optimizer.args)
 
     total_steps = num_epochs * len(dataloader_train)
 
-    model_scheduler = CosineAnnealingLR(model_optimizer, T_max=total_steps, eta_min=1e-8)
-    masker_scheduler = CosineAnnealingLR(masker_optimizer, T_max=total_steps, eta_min=1e-8)
+    model_scheduler = getattr(optim.lr_scheduler, config.lstm_lr_scheduler.name)(model_optimizer, T_max=total_steps, **config.lstm_lr_scheduler.args)
+    masker_scheduler = getattr(optim.lr_scheduler, config.masker_lr_scheduler.name)(masker_optimizer, T_max=total_steps, **config.masker_lr_scheduler.args)
 
-    class_weights = torch.ones(49)
-    class_weights[0] = 0.5
+    class_weights = torch.ones(config.masker_model.n_class)
+    class_weights[0] = config.criterion.background_weight
     class_weights = class_weights.to(device)
 
-    criterion = nn.CrossEntropyLoss(weight=class_weights)
+    criterion = getattr(nn, config.criterion.name)(weight=class_weights, **config.criterion.args)
 
-    early_stop = EarlyStop(patience, loss=True)
+    early_stop = EarlyStop(config.training.early_stopping_patience)
+
+    # # Parameters (TO DO: Make a config file for all of them)
+    # num_epochs = 20
+    # # div_factor = 10 # max_lr/div_factor = initial lr
+    # # final_div_factor = 100 # final lr is initial_lr/final_div_factor 
+    # batch_size = 8
+    # patience = 15
+
+    # print('Loading train data...')
+    # train_data_dir  = os.path.join(args.train-dir, 'data')
+    # train_annotation_dir = os.path.join(args.train-dir, 'annotations.txt')
+    # dataloader_train = load_data(train_data_dir, train_annotation_dir, batch_size, mask=True)
+
+    # print('Loading val data...')
+    # val_data_dir  = os.path.join(args.val-dir, 'data')
+    # val_annotation_dir = os.path.join(args.val-dir, 'annotations.txt')
+    # dataloader_val = load_data(val_data_dir, val_annotation_dir, batch_size, mask=True)
+
+    # # Used this approach so that we can get back to training the loaded model from checkpoint
+    # epoch = 0
+
+    # # Define LSTM
+    # model = Seq2Seq(num_channels=49, num_kernels=64, kernel_size=(3, 3), padding=(1, 1), activation="relu", frame_size=(160, 240), num_layers=3, device=device)
+    # model_checkpoint = torch.load(args.model-dir, map_location=device)
+    # model.load_state_dict(model_checkpoint)
+    # model.to(device)
+
+    # masker = Unet_masker = UNet(                 # model input channels (1 for gray-scale images, 3 for RGB, etc.)
+    #     n_class=49,                      # model output channels (number of classes in your dataset)
+    # )
+    # unet_checkpoint = torch.load(args.masker-dir, map_location=device)
+    # masker.load_state_dict(unet_checkpoint)
+    # masker.to(device)
+
+    # model_optimizer = AdamW(model.parameters(), lr=1e-4, weight_decay=0.005)
+    # masker_optimizer = AdamW(masker.parameters(), lr=1e-4, weight_decay=0.005)
+
+    # total_steps = num_epochs * len(dataloader_train)
+
+    # model_scheduler = CosineAnnealingLR(model_optimizer, T_max=total_steps, eta_min=1e-8)
+    # masker_scheduler = CosineAnnealingLR(masker_optimizer, T_max=total_steps, eta_min=1e-8)
+
+    # class_weights = torch.ones(49)
+    # class_weights[0] = 0.5
+    # class_weights = class_weights.to(device)
+
+    # criterion = nn.CrossEntropyLoss(weight=class_weights)
+
+    # early_stop = EarlyStop(patience)
 
     if args.resume:
         print("Attempting to find existing checkpoint")
-        path_partials = os.path.join(save_dir, "finetune/partial")
+        path_partials = os.path.join(paths.save_dir, "models/partial")
         try:
             checkpoint = torch.load(os.path.join(path_partials, "checkpoint.pkl"), map_location=device)
             model.load_state_dict(checkpoint['model_state_dict'])
@@ -312,7 +407,7 @@ if __name__ == "__main__":
     model.to(device)
 
     print('Start finetuning model...')
-    results = finetune(epoch, model, masker, dataloader_train, dataloader_val, criterion, model_optimizer, masker_optimizer, model_scheduler, masker_scheduler, early_stop, num_epochs, device, save_dir)
+    results = finetune(epoch, model, masker, dataloader_train, dataloader_val, criterion, model_optimizer, masker_optimizer, model_scheduler, masker_scheduler, early_stop, num_epochs, device, paths.save_dir)
 
     print(f'Model finetuning finshed at epoch {results["epochs"]}, trainig loss: {results["train_loss"]}')
 

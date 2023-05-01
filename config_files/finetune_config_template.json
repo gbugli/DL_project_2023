@@ -1,0 +1,49 @@
+{
+    "lstm_model": {
+        "num_channels": <int, number of classes>,
+        "num_kernels": <int, number of kernels>,
+        "kernel_size": <tuple, size of the conv kernel>,
+        "padding": <tuple, dimension of the padding>,
+        "activation": <str, name of the activation function between 'tanh' and 'relu'>,
+        "frame_size": <tuple, shape of the input image>,
+        "num_layers": <int, depth of the model>
+    },
+    "masker_model": {
+        "n_class": <int, number of classes>
+    },
+    "data": {
+        "train": {
+            "path": <str, path to dataset dir>,
+            "batch_size": <int, batch size>
+        }, 
+        "val": {
+            "path": <str, path to dataset dir>>,
+            "batch_size": <int, batch size>
+        }
+    },
+    "lstm_optimizer": {
+        "name": <str, name of the optimizer as in torch.optim>,
+        "args": <dict, arguments of the optimizer>
+    },
+    "lstm_lr_scheduler": {
+        "name": <str, name of the LR scheduler as in torch.optim.lr_scheduler>,
+        "args": <dict, arguments of the LR scheduler>
+    },
+    "masker_optimizer": {
+        "name": <str, name of the optimizer as in torch.optim>,
+        "args": <dict, arguments of the optimizer>
+    },
+    "masker_lr_scheduler": {
+        "name": <str, name of the LR scheduler as in torch.optim.lr_scheduler>,
+        "args": <dict, arguments of the LR scheduler>
+    },
+    "criterion": {
+        "name": <str, name of the LR scheduler as in torch.optim.lr_scheduler>,
+        "background_weight": <float, weight of the background class>
+        "args": <dict[optional], arguments of the criterion>
+    },
+    "training": {
+        "epochs": <int, number of epochs>,
+        "early_stopping_patience": <int, number of epochs for early stopping>
+    }
+  }
