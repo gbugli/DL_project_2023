@@ -289,5 +289,4 @@ class MaskDataset(Dataset):
     def __getitem__(self, idx):
         mask_path = os.path.join(self.save_dir, self.files[idx])
         mask = torch.load(mask_path)
-        #label = torch.tensor(0)  # Dummy label; replace with actual labels if needed
-        return mask.unsqueeze(0) #, label
+        return mask.unsqueeze(0)
