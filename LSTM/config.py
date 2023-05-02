@@ -38,7 +38,7 @@ class TrainingConfig:
 
 @attrs
 class UNetConfig:
-    lstm_model = attrib(type=ModelConfig)
+    unet_model = attrib(type=ModelConfig)
     data = attrib(type=DataConfig)
     optimizer = attrib(type=NameArgsConfig)
     lr_scheduler = attrib(type=NameArgsConfig)
@@ -53,7 +53,7 @@ class UNetConfig:
 
     @classmethod
     def from_dict(cls, config):
-        config["lstm_model"] = ModelConfig(**config["lstm_model"])
+        config["unet_model"] = ModelConfig(**config["unet_model"])
         config["data"] = DataConfig(**config["data"])
         if config["data"].train:
             config["data"].train = TrainConfig(**config["data"].train)

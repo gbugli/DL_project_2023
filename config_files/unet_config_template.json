@@ -24,7 +24,7 @@
         "args": <dict, arguments of the LR scheduler>
     },
     "criterion": {
-        "name": <str, name of the LR scheduler as in torch.optim.lr_scheduler>,
+        "name": <str, name of the LR scheduler as in torch.optim.lr_scheduler or our custom losses>,
         "background_weight": <float, weight of the background class>
         "args": <dict[optional], arguments of the criterion>
     },
