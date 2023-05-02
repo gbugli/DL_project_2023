@@ -35,7 +35,7 @@ Val set
     - `mkdir data`
     - `mv -r video_* data`
 - Go to location of the `annotations_generator.py` script
-- Execute the following command to generate the annotations file for the `train` dataset:
+- Execute the following command to generate the annotations file for the `val` dataset:
     - `python annotations_generator.py 1000 2000 path_to_dataset/val 22`
 
 Unlabeled set
@@ -44,7 +44,7 @@ Unlabeled set
     - `mkdir data`
     - `mv -r video_* data`
 - Go to location of the `annotations_generator.py` script
-- Execute the following command to generate the annotations file for the `train` dataset:
+- Execute the following command to generate the annotations file for the `unlabeled` dataset:
     - `python annotations_generator.py 2000 15000 path_to_dataset/unlabeled 22`
 
 Hidden set
@@ -53,7 +53,7 @@ Hidden set
     - `mkdir data`
     - `mv -r video_* data`
 - Go to location of the `annotations_generator.py` script
-- Execute the following command to generate the annotations file for the `train` dataset:
+- Execute the following command to generate the annotations file for the `hidden` dataset:
     - `python annotations_generator.py 15000 17000 path_to_hidden_dataset 11`
 
 # Train the UNet masker network
