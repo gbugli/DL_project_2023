@@ -27,7 +27,7 @@ from argparse import ArgumentParser, Namespace
 from video_dataset import VideoFrameDataset, ImglistToTensor, MaskDataset
 
 from Seq2Seq import Seq2Seq
-from UNet_pretraining import UNet
+from unet_model import UNet
 from early_stop import EarlyStop
 import losses
 
@@ -148,7 +148,7 @@ def finetune(epoch, model, masker, train_loader, val_loader, criterion, model_op
             if idx % 50 == 0 and epoch < 5:
               print(f"Loss on current batch: {loss.item()}") # we can just take a sample, don't need to average it
             
-        avg_epoch_loss = train_loss / len(train_loader)
+        avg_epoch_loss = train_loss / len(train_loader * 11)
         end_time = time.time()
 
         model.eval()
@@ -305,7 +305,7 @@ if __name__ == "__main__":
     model.to(device)
     print('LSTM Loaded.')
 
-    masker = Unet_masker = UNet(**config.masker_model.args)
+    masker = UNet(**config.masker_model.args)
     unet_checkpoint = torch.load(config.masker_model.path, map_location=device)
     masker.load_state_dict(unet_checkpoint)
     masker.to(device)

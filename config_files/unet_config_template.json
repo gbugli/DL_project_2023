@@ -1,14 +1,8 @@
 {
-    "lstm_model": {
-        "path": < str[optional], path to the best saved LSTM model>,
+    "unet_model": {
+        "path": < str[optional], path to the best saved UNet model>,
         "args": {
-            "num_channels": <int, number of classes>,
-            "num_kernels": <int, number of kernels>,
-            "kernel_size": <tuple, size of the conv kernel>,
-            "padding": <tuple, dimension of the padding>,
-            "activation": <str, name of the activation function between 'tanh' and 'relu'>,
-            "frame_size": <tuple, shape of the input image>,
-            "num_layers": <int, depth of the model>
+            "n_class": <int, number of classes>
         }
     },
     "data": {
