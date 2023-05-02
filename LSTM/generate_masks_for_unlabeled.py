@@ -1,4 +1,4 @@
-from unet_model import UNet
+from UNet_model import UNet
 from video_dataset import VideoFrameDataset, ImglistToTensor
 from tqdm import tqdm
 from einops import rearrange
