@@ -414,7 +414,7 @@ if __name__ == "__main__":
         try:
             checkpoint = torch.load(os.path.join(path_partials, "checkpoint.pkl"), map_location=device)
             model.load_state_dict(checkpoint['model_state_dict'])
-            masker.load_state_dict(checkpoint['masker_state_dict'])
+            # masker.load_state_dict(checkpoint['masker_state_dict'])
             model_optimizer.load_state_dict(checkpoint['model_optimizer_state_dict'])
             if model_scheduler is not None:
                 model_scheduler.load_state_dict(checkpoint['model_scheduler_state_dict'])

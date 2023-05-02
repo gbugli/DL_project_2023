@@ -311,7 +311,7 @@ if __name__ == "__main__":
     num_epochs = 30
     # div_factor = 10 # max_lr/div_factor = initial lr
     # final_div_factor = 100 # final lr is initial_lr/final_div_factor 
-    batch_size = 4
+    batch_size = 8
     patience = 15
 
     print('Loading train data...')
@@ -327,17 +327,17 @@ if __name__ == "__main__":
     epoch = 0
 
     # Define LSTM
-    model = Seq2Seq(num_channels=49, num_kernels=128, kernel_size=(3, 3), padding=(1, 1), activation="relu", frame_size=(160, 240), num_layers=4, device=device)
+    model = Seq2Seq(num_channels=49, num_kernels=64, kernel_size=(3, 3), padding=(1, 1), activation="relu", frame_size=(160, 240), num_layers=2, device=device)
     model.to(device)
 
-    optimizer = AdamW(model.parameters(), lr=5e-5, weight_decay=0.005)
+    optimizer = AdamW(model.parameters(), lr=1e-5, weight_decay=0.005)
 
     total_steps = num_epochs * len(dataloader_unlabeled)
     scheduler = CosineAnnealingLR(optimizer, T_max=total_steps, eta_min=1e-8)
 
 
     class_weights = torch.ones(49)
-    class_weights[0] = 0.5
+    class_weights[0] = 0.3
     class_weights = class_weights.to(device)
 
     # criterion = nn.CrossEntropyLoss(weight=class_weights)
