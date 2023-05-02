@@ -1,6 +1,6 @@
 {
     "lstm_model": {
-        "path": "/scartch/gb2572/DL_project/output/LSTM-mp-2/models/best/best_model.pkl",
+        "path": "/scratch/gb2572/DL_project/output/LSTM-mp-2/models/best/best_model.pkl",
         "args": {
             "num_channels": 49,
             "num_kernels": 64,
@@ -12,7 +12,7 @@
         }
     },
     "masker_model": {
-        "path": "/scartch/gb2572/DL_project/output/unet/best_model_20_epochs.pkl",
+        "path": "/scratch/gb2572/DL_project/output/unet/best_model_20_epochs.pkl",
         "args": {
             "n_class": 49
         }
