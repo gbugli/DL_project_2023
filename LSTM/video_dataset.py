@@ -1,3 +1,6 @@
+### Video Dataset
+# Code adapted from https://github.com/RaivoKoot/Video-Dataset-Loading-Pytorch
+
 import os
 import os.path
 import numpy as np

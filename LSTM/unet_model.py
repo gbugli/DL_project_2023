@@ -1,4 +1,5 @@
-### Code from: https://github.com/usuyama/pytorch-unet/blob/master/pytorch_unet.py
+### UNet model for mask prediction
+# Code adapted from https://github.com/usuyama/pytorch-unet
 
 import torch
 import torch.nn as nn
