@@ -13,7 +13,7 @@ from torchvision import datasets, transforms
 import math
 import torch.nn.functional as F
 import warnings
-from video_dataset import VideoFrameDataset, ImglistToTensor
+from IJEPA.video_dataset import VideoFrameDataset, ImglistToTensor
 from argparse import ArgumentParser, Namespace
 
 ### Use Encoder and Decoder to predict the hidden set

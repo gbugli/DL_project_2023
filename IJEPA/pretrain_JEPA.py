@@ -13,10 +13,10 @@ from torchvision import datasets, transforms
 import math
 import torch.nn.functional as F
 import warnings
-from video_dataset import VideoFrameDataset, ImglistToTensor
+from IJEPA.video_dataset import VideoFrameDataset, ImglistToTensor
 from argparse import ArgumentParser, Namespace
 
-from models import IJEPA_base, CustomDataParallel, EarlyStop
+from IJEPA.models import IJEPA_base, CustomDataParallel, EarlyStop
 
 def parse_args() -> Namespace:
     parser = ArgumentParser("JEPA")

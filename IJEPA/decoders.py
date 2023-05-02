@@ -9,7 +9,7 @@ from torchvision import datasets, transforms
 import math
 import torch.nn.functional as F
 import warnings
-from video_dataset import VideoFrameDataset, ImglistToTensor
+from IJEPA.video_dataset import VideoFrameDataset, ImglistToTensor
 import torch
 from torch import Tensor
 import torch.nn as nn
@@ -18,7 +18,7 @@ from torch.nn import TransformerDecoder, TransformerDecoderLayer
 from typing import Optional
 import math
 from functools import partial
-from models import trunc_normal_
+from IJEPA.models import trunc_normal_
 
 
 class DecoderSimple(nn.Module):
