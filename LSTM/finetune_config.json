@@ -1,24 +1,30 @@
 {
     "lstm_model": {
-        "num_channels": 49,
-        "num_kernels": 64,
-        "kernel_size": [3,3],
-        "padding": [1,1],
-        "activation": "relu",
-        "frame_size": [160,240],
-        "num_layers": 5
+        "path": "/scratch/gb2572/DL_project_2023/output/LSTM-mp-2/models/best/best_model.pkl",
+        "args": {
+            "num_channels": 49,
+            "num_kernels": 64,
+            "kernel_size": [3,3],
+            "padding": [1,1],
+            "activation": "relu",
+            "frame_size": [160,240],
+            "num_layers": 5
+        }
     },
     "masker_model": {
-        "n_class": 49
+        "path": "/scratch/gb2572/DL_project_2023/output/unet/best_model_20_epochs.pkl",
+        "args": {
+            "n_class": 49
+        }
     },
     "data": {
         "train": {
             "path": "/train",
-            "batch_size": 2
+            "batch_size": 8
         }, 
         "val": {
             "path": "/val",
-            "batch_size": 2
+            "batch_size": 8
         }
     },
     "lstm_optimizer": {

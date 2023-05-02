@@ -1,55 +1,42 @@
 import os
-import os.path
 import numpy as np
 from PIL import Image
-from torchvision import transforms
-import torch
 from typing import List, Union, Tuple, Any
 
 import time
 
 import torch
 import torch.nn as nn
-
-import numpy as np
-import torch.nn as nn
-from torch.optim import Adam
-from torch.utils.data import DataLoader
-
-import io
-from ipywidgets import widgets, HBox
-import torch.nn.functional as F
-from torch.utils.data import Dataset
+from torch import optim
 from einops import rearrange
 import matplotlib.pyplot as plt
+import torch.nn.functional as F
+from torchvision import transforms
+from torch.utils.data import DataLoader
+import matplotlib.pyplot as plt
 
-from torch.optim import AdamW
-from torch.optim.lr_scheduler import CosineAnnealingLR
 import torchmetrics
 
+# To use config
+from config import LSTMConfig
+
+# To use Paths class
+from utils.file_utils import create_output_dirs, PathsContainer
 from argparse import ArgumentParser, Namespace
 
 from video_dataset import VideoFrameDataset, ImglistToTensor, MaskDataset
 
-from early_stop import EarlyStop
-
 from Seq2Seq import Seq2Seq
+from early_stop import EarlyStop
+import losses
 
-from losses import CEandDiceLoss
 
-# # To use config
-# from config import Config
-
-# To use Paths class
-# from utils.file_utils import create_output_dirs, PathsContainer
 
 
 
 def parse_args() -> Namespace:
     parser = ArgumentParser("ConvLSTM")
-    # parser.add_argument("--config-file-name", required=True, type=str, help="Name of json file with config")
-    parser.add_argument("--train-dir", help="Name of dir with unlabeled training data", required=True, type=str)
-    parser.add_argument("--val-dir", help="Name of dir with validation data", required=True, type=str)
+    parser.add_argument("--config-file-name", required=True, type=str, help="Name of json file with config")
     parser.add_argument("--output-dir", help="Name of dir to save the checkpoints to", required=True, type=str)
     parser.add_argument("--run-id", help="Name of the run", required=True, type=str)
     parser.add_argument("--resume", help="In case training was not completed resume from last epoch", default=False, type=bool)
@@ -60,16 +47,13 @@ def collate(batch):
 
     batch = torch.cat(batch)
 
-    # Add channel dim, scale pixels between 0 and 1, send to GPU
-
-    #split input and target
+    # Split input and target
+    # Randomly pick 10 frames as input, 11th frame is target
     rand = np.random.randint(11,21)
     input = batch[:,rand-11:rand, :, :]
     target = batch[:,rand,:,:]
-    input = one_hot_encoding(input, 49)             
-    # input, target = input.to(device), target.to(device)                     
-
-    # Randomly pick 10 frames as input, 11th frame is target                   
+    input = one_hot_encoding(input, 49)                             
+                   
     return input, target 
 
 
@@ -104,7 +88,6 @@ def load_data(root, annotation_file, batch_size=2, mask=False, shuffle=True):
 
 def one_hot_encoding(input_tensor, num_classes=49):
     one_hot = F.one_hot(input_tensor.long(), num_classes)
-    #print(one_hot.shape)
     one_hot = rearrange(one_hot, 'b f h w c -> b c f h w')  # Change the dimensions to (batch_size, num_classes, height, width)
     return one_hot
 
@@ -116,7 +99,6 @@ def train(epoch, model, train_loader, val_loader, criterion, optimizer, schedule
         start_time = time.time()
         model.train()
         train_loss = 0                                            
-        # pbar = tqdm(enumerate(dataloader), total=len(dataloader))
         for idx, data in enumerate(train_loader):
             input, target = data
             input, target = input.to(device), target.to(device)
@@ -143,7 +125,6 @@ def train(epoch, model, train_loader, val_loader, criterion, optimizer, schedule
         predicted_masks_22 = []
         actual_masks_22 = []
         val_loss = 0
-        #valbar = tqdm(enumerate(valloader), total=len(valloader))
         with torch.no_grad():
             for idx, data in enumerate(val_loader):
                 input, label, masks = data
@@ -219,7 +200,6 @@ def validate_model(model, valloader, index_to_show):
     predicted_masks_22 = []
     actual_masks_22 = []
     predicted_masks_show = []
-    # pbar = tqdm(enumerate(valloader), total=len(valloader))
     with torch.no_grad():
         for batch_num, data in enumerate(valloader):
             input, label, masks = data
@@ -285,69 +265,60 @@ if __name__ == "__main__":
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    # Create all the paths to save models and files if don't already exist
-    save_dir = os.path.join(args.output_dir,args.run_id)
-    os.makedirs(save_dir, exist_ok=True)
-    os.makedirs(os.path.join(save_dir, "models/partial"), exist_ok=True)
-    os.makedirs(os.path.join(save_dir, "models/best"), exist_ok=True)
-    os.makedirs(os.path.join(save_dir, "training_plots"), exist_ok=True)
+    paths = PathsContainer.from_args(args.output_dir, args.run_id, args.config_file_name)
+    create_output_dirs(paths.save_dir)
 
-    # # instead of the above do the following
-    # paths = PathsContainer.from_args(args.output_dir, args.run_id, args.config_file_name)
-    # create_output_dirs(paths.save_dir)
+    if args.resume:
+        print("Resuming training...")
+        config = LSTMConfig.from_json(os.path.join(paths.save_dir, 'used_config.json'))
+        config_input = LSTMConfig.from_json(paths.config_path)
+        if config_input != config:
+            print("Input config differs from used config: loading used config")
+    else:
+        config = LSTMConfig.from_json(paths.config_path)
+        output_config_path = os.path.join(paths.save_dir, "used_config.json")
+        os.system("cp {} {}".format(paths.config_path, output_config_path))
 
-    # if args.resume:
-    #     print("Resuming training...")
-    #     config = Config.from_json(os.path.join(paths.save_dir, 'used_config.json'))
-    #     config_input = Config.from_json(paths.config_path)
-    #     if config_input != config:
-    #         logger.warning("Input config differs from used config: loading used config")
-    # else:
-    #     config = Config.from_json(paths.config_path)
-    #     output_config_path = os.path.join(paths.save_dir, "used_config.json")
-    #     os.system("cp {} {}".format(paths.config_path, output_config_path))
-
-    # Parameters (TO DO: Make a config file for all of them)
-    num_epochs = 30
-    # div_factor = 10 # max_lr/div_factor = initial lr
-    # final_div_factor = 100 # final lr is initial_lr/final_div_factor 
-    batch_size = 8
-    patience = 15
+    num_epochs = config.training.epochs
 
     print('Loading train data...')
-    dataset_unlabeled = MaskDataset(save_dir=args.train_dir)
-    dataloader_unlabeled = DataLoader(dataset_unlabeled, batch_size=batch_size, shuffle=True, collate_fn=collate)
+    dataset_unlabeled = MaskDataset(save_dir=config.data.train.path)
+    dataloader_unlabeled = DataLoader(dataset_unlabeled, batch_size=config.data.train.batch_size, shuffle=True, collate_fn=collate)
 
     print('Loading val data...')
-    val_data_dir  = os.path.join(args.val_dir, 'data')
-    val_annotation_dir = os.path.join(args.val_dir, 'annotations.txt')
-    dataloader_val = load_data(val_data_dir, val_annotation_dir, batch_size, mask=True)
+    val_data_dir  = os.path.join(config.data.val.path, 'data')
+    val_annotation_dir = os.path.join(config.data.val.path, 'annotations.txt')
+    dataloader_val = load_data(val_data_dir, val_annotation_dir, config.data.val.batch_size, mask=True)
 
-    # Used this approach so that we can get back to training the loaded model from checkpoint
     epoch = 0
 
-    # Define LSTM
-    model = Seq2Seq(num_channels=49, num_kernels=64, kernel_size=(3, 3), padding=(1, 1), activation="relu", frame_size=(160, 240), num_layers=2, device=device)
+    model = Seq2Seq(**config.lstm_model.args, device=device)
     model.to(device)
+    print('LSTM Loaded.')
 
-    optimizer = AdamW(model.parameters(), lr=1e-5, weight_decay=0.005)
+    optimizer = getattr(optim, config.lstm_optimizer.name)(params=model.parameters(), **config.lstm_optimizer.args)
 
     total_steps = num_epochs * len(dataloader_unlabeled)
-    scheduler = CosineAnnealingLR(optimizer, T_max=total_steps, eta_min=1e-8)
 
+    scheduler = getattr(optim.lr_scheduler, config.lstm_lr_scheduler.name)(optimizer, T_max=total_steps, **config.lstm_lr_scheduler.args)
 
     class_weights = torch.ones(49)
-    class_weights[0] = 0.3
+    class_weights[0] = config.criterion.background_weight
     class_weights = class_weights.to(device)
 
-    # criterion = nn.CrossEntropyLoss(weight=class_weights)
-    criterion = CEandDiceLoss(class_weights, 0.3, 0.7)
+    if config.criterion.name in ['CEandDiceLoss', 'MaskLoss']:
+        criterion = getattr(losses, config.criterion.name)(weight=class_weights, **config.criterion.args)
+    else:
+        criterion = getattr(nn, config.criterion.name)(weight=class_weights, **config.criterion.args)
 
-    early_stop = EarlyStop(patience)
+    criterion.to(device)
+
+    early_stop = EarlyStop(config.training.early_stopping_patience)
+
 
     if args.resume:
         print("Attempting to find existing checkpoint")
-        path_partials = os.path.join(save_dir, "models/partial")
+        path_partials = os.path.join(paths.save_dir, "models/partial")
         try:
             checkpoint = torch.load(os.path.join(path_partials, "checkpoint.pkl"), map_location=device)
             model.load_state_dict(checkpoint['model_state_dict'])
@@ -367,11 +338,8 @@ if __name__ == "__main__":
     model.to(device)
 
     print('Start training model...')
-    results = train(epoch, model, dataloader_unlabeled, dataloader_val, criterion, optimizer, scheduler, early_stop, num_epochs, device, save_dir)
+    results = train(epoch, model, dataloader_unlabeled, dataloader_val, criterion, optimizer, scheduler, early_stop, num_epochs, device, paths.save_dir)
 
     print(f'Model training finshed at epoch {results["epochs"]}, trainig loss: {results["train_loss"]}')
 
-    # print('Evaluating model...')
-    # pred, actual = validate_model(model, dataloader_val, 10)
-    # plot_model_result(pred, actual, save_dir + '/training_plots', fig_name='example_19_epochs')
 

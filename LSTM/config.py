@@ -6,18 +6,9 @@ from attr import attrib, attrs
 
 
 @attrs
-class LSTMConfig:
-    num_channels = attrib(type=int)
-    num_kernels = attrib(type=int)
-    kernel_size = attrib(type=tuple)
-    padding = attrib(type=tuple)
-    activation = attrib(type=str)
-    frame_size = attrib(type=tuple)
-    num_layers = attrib(type=int)
-
-@attrs
-class MaskerConfig:
-    n_class = attrib(type=int)
+class ModelConfig:
+    path = attrib(type=str)
+    args = attrib(type=dict)
 
 @attrs
 class TrainConfig:
@@ -47,8 +38,8 @@ class TrainingConfig:
 
 
 @attrs
-class Config:
-    lstm_model = attrib(type=LSTMConfig)
+class LSTMConfig:
+    lstm_model = attrib(type=ModelConfig)
     data = attrib(type=DataConfig)
     optimizer = attrib(type=NameArgsConfig)
     lr_scheduler = attrib(type=NameArgsConfig)
@@ -59,11 +50,11 @@ class Config:
     def from_json(cls, config_path):
         with open(config_path) as config_file:
             config = json.load(config_file)
-            return Config.from_dict(config)
+            return LSTMConfig.from_dict(config)
 
     @classmethod
     def from_dict(cls, config):
-        config["lstm_model"] = LSTMConfig(**config["lstm_model"])
+        config["lstm_model"] = ModelConfig(**config["lstm_model"])
         config["data"] = DataConfig(**config["data"])
         if config["data"].train:
             config["data"].train = TrainConfig(**config["data"].train)
@@ -78,8 +69,8 @@ class Config:
 
 @attrs
 class FineTuneConfig:
-    lstm_model = attrib(type=LSTMConfig)
-    masker_model = attrib(type=MaskerConfig)
+    lstm_model = attrib(type=ModelConfig)
+    masker_model = attrib(type=ModelConfig)
     data = attrib(type=DataConfig)
     lstm_optimizer = attrib(type=NameArgsConfig)
     lstm_lr_scheduler = attrib(type=NameArgsConfig)
@@ -94,8 +85,8 @@ class FineTuneConfig:
 
     @classmethod
     def from_dict(cls, config):
-        config["lstm_model"] = LSTMConfig(**config["lstm_model"])
-        config["masker_model"] = MaskerConfig(**config["masker_model"])
+        config["lstm_model"]= ModelConfig(**config["lstm_model"])
+        config["masker_model"] = ModelConfig(**config["masker_model"])
         config["data"] = DataConfig(**config["data"])
         if config["data"].train:
             config["data"].train = TrainConfig(**config["data"].train)
