@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from models.ConvLSTMCell import ConvLSTMCell
+from ConvLSTMCell import ConvLSTMCell
 
 
 class ConvLSTM(nn.Module):
