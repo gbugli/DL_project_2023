@@ -8,18 +8,19 @@ Our overall model contains 2 major components, and 3 steps to do the training. W
 So the full pipeline is `context images -> generate mask with UNet masker -> recursively predict next 11 with convLSTM`
 
 And the training steps are:
-1. train the masker with the training set
-2. pretrain the convLSTM on the generated masks for the unlabeled set
-3. finetune the complete network on the training set
+1. Train the masker with the training set
+2. Pretrain the convLSTM on the generated masks for the unlabeled set
+3. (Optional) Finetune the complete network on the training set
 
 # Custom dataset loader VideoFrameDataset
 In order to change the data into the format required for loading with our custom dataloader (adapted from https://github.com/RaivoKoot/Video-Dataset-Loading-Pytorch), you need to generate an annotations file. To do this you need to:
 1. Unzip the Dataset_Student.zip; we let `path_to_dataset` indicate the path to the unzipped `Dataset_Student` folder.
-2. Inside each `val`, `unlabeled`, and `train`, create a `data` directory and move all the video frames into it. To do this first go to the respective directory (e.g. `train`) and first run `m 
+2. Inside each `val`, `unlabeled`, and `train`, create a `data` directory and move all the video frames into it. To do this follow the instrctions below.
 3. Then, for each of the three sets, run the `annotations_generator.py` script, with the first two arguments being the start and final ids of the videos in the dataset, the directory of the dataset, and the number of frames.
 4. For the `hidden` set, the process is the same, but the files have only 11 frames.
 5. Each dataset directory should now have a `data` folder with the videos and an `annotations.txt`, which allows the VideoFrameDataset to load them.
 
+Instructions for dataset preparation:
 Train set 
 - Go to `path_to_dataset/train`
 - Execute the following commands to move all the video folders inside a folder named `data`:
@@ -77,8 +78,7 @@ To pretrain the ConvLSTM on the generated masks for the unlabeled dataset, we pr
 
 Usage: `python ConvLSTM_train.py --config-file-name configs/lstm_config.json --output-dir [where/to/put/checkpoints] --run-id [assign-a-run-id] --resume [True/False, depending on if you are resuming a previous run]`
 
-# Finetune ConvLSTM
-#todo
+# (Optional) Finetune ConvLSTM
 We perform the finetuning on the provided training set of the ConvLSTM for the specific prediction task. We finetuned the ConvLSTM pre-trained as described above using the labeled training set, containing true mask labels for each of the 22 video frames. The finetuning process works as follows
 - For each batch, we first use the first 11 frames to predict the following one (12th), compute the loss and update the parameters with the optimizer step.
 - Then we recursively predict the following frames building on the previous ones and update the parameters at every step. This means that to predict the 22nd frame will use the previous 10 predicted and the 11th given.
