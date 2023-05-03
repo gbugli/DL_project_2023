@@ -29,7 +29,7 @@
         }
     },
     "criterion": {
-        "name": "CrossEntropyLoss",
+        "name": "MaskLoss",
         "background_weight": 0.3,
         "args": {}
     },
