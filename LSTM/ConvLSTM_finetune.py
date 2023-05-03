@@ -24,11 +24,11 @@ from functools import partial
 from utils.file_utils import create_output_dirs, PathsContainer
 from argparse import ArgumentParser, Namespace
 
-from video_dataset import VideoFrameDataset, ImglistToTensor, MaskDataset
+from dataset.video_dataset import VideoFrameDataset, ImglistToTensor, MaskDataset
 
-from Seq2Seq import Seq2Seq
-from unet_model import UNet
-from early_stop import EarlyStop
+from models.Seq2Seq import Seq2Seq
+from models.UNet import UNet
+from utils.early_stop import EarlyStop
 import losses
 
 
@@ -93,7 +93,6 @@ def finetune(epoch, model, masker, train_loader, val_loader, criterion, model_op
             model_optimizer.zero_grad()
 
             frames = rearrange(frames, 'b t c h w -> (b t) c h w')
-            # masks = rearrange(masks, 'b t h w -> (b t) h w')
 
             gen_masks = masker(frames)
             gen_masks = torch.argmax(gen_masks, dim=1)
@@ -118,29 +117,6 @@ def finetune(epoch, model, masker, train_loader, val_loader, criterion, model_op
                 pred = one_hot_encoding(pred.unsqueeze(1))
                 context = context[:,:,-10:]
                 context = torch.cat([context, pred], dim=2)
-
-                # if frame != 10:
-                #     pred = torch.argmax(pred, dim=1)
-                #     pred = one_hot_encoding(pred.unsqueeze(1))
-                #     context = context[:,:,-10:]
-                #     context = torch.cat([context, pred], dim=2)
-
-            # target = masks[:,-1]
-            # loss = criterion(pred, target.long())
-
-            # rand = np.random.randint(11,21)
-            # input = gen_masks[:,rand-11:rand, :, :]
-            # target_mask = masks[:,rand,:,:]
-            # input = one_hot_encoding(input, 49)   
-
-            # output = model(input)
-                                        
-            # loss = criterion(output, target_mask.long())       
-            # loss.backward()      
-
-            # model_optimizer.step()
-
-            # train_loss += loss.item()
 
             if model_scheduler is not None:
                 model_scheduler.step()

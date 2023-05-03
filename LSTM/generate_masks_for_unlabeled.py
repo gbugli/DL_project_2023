@@ -1,5 +1,3 @@
-from UNet_model import UNet
-from video_dataset import VideoFrameDataset, ImglistToTensor
 from tqdm import tqdm
 from einops import rearrange
 import os
@@ -11,6 +9,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import copy
 from argparse import ArgumentParser, Namespace
+from models.UNet import UNet
+from dataset.video_dataset import VideoFrameDataset, ImglistToTensor
 
 
 def parse_args() -> Namespace:

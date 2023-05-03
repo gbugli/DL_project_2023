@@ -1,6 +1,6 @@
-{
+    {
     "lstm_model": {
-        "path": "/scratch/gb2572/DL_project_2023/output/LSTM-mp-2/models/best/best_model.pkl",
+        "path": "",
         "args": {
             "num_channels": 49,
             "num_kernels": 64,
@@ -8,18 +8,12 @@
             "padding": [1,1],
             "activation": "relu",
             "frame_size": [160,240],
-            "num_layers": 5
-        }
-    },
-    "masker_model": {
-        "path": "/scratch/gb2572/DL_project_2023/output/unet/best_model_20_epochs.pkl",
-        "args": {
-            "n_class": 49
+            "num_layers": 2
         }
     },
     "data": {
         "train": {
-            "path": "/train",
+            "path": "/scratch/gb2572/unlabeled_masks",
             "batch_size": 8
         }, 
         "val": {
@@ -27,14 +21,14 @@
             "batch_size": 8
         }
     },
-    "lstm_optimizer": {
+    "optimizer": {
         "name": "AdamW",
         "args": {
-                "lr":5e-5, 
+                "lr":1e-5, 
                 "weight_decay": 0.005
         }
     },
-    "lstm_lr_scheduler": {
+    "lr_scheduler": {
         "name": "CosineAnnealingLR",
         "args": {
                 "eta_min": 1e-8
@@ -42,11 +36,11 @@
     },
     "criterion": {
         "name": "CrossEntropyLoss",
-        "background_weight": 0.2,
+        "background_weight": 0.3,
         "args": {}
     },
     "training": {
         "epochs": 20,
         "early_stopping_patience": 15
     }
-  }
+}

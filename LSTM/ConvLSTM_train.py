@@ -24,10 +24,10 @@ from config import LSTMConfig
 from utils.file_utils import create_output_dirs, PathsContainer
 from argparse import ArgumentParser, Namespace
 
-from video_dataset import VideoFrameDataset, ImglistToTensor, MaskDataset
+from dataset.video_dataset import VideoFrameDataset, ImglistToTensor, MaskDataset
 
-from Seq2Seq import Seq2Seq
-from early_stop import EarlyStop
+from models.Seq2Seq import Seq2Seq
+from utils.early_stop import EarlyStop
 import losses
 
 
@@ -296,11 +296,11 @@ if __name__ == "__main__":
     model.to(device)
     print('LSTM Loaded.')
 
-    optimizer = getattr(optim, config.lstm_optimizer.name)(params=model.parameters(), **config.lstm_optimizer.args)
+    optimizer = getattr(optim, config.optimizer.name)(params=model.parameters(), **config.optimizer.args)
 
     total_steps = num_epochs * len(dataloader_unlabeled)
 
-    scheduler = getattr(optim.lr_scheduler, config.lstm_lr_scheduler.name)(optimizer, T_max=total_steps, **config.lstm_lr_scheduler.args)
+    scheduler = getattr(optim.lr_scheduler, config.lr_scheduler.name)(optimizer, T_max=total_steps, **config.lr_scheduler.args)
 
     class_weights = torch.ones(49)
     class_weights[0] = config.criterion.background_weight

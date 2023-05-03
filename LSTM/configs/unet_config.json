@@ -1,0 +1,40 @@
+{
+    "unet_model": {
+        "path": "",
+        "args": {
+            "n_class": 49
+        }
+    },
+    "data": {
+        "train": {
+            "path": "/train",
+            "batch_size": 2
+        }, 
+        "val": {
+            "path": "/val",
+            "batch_size": 2
+        }
+    },
+    "optimizer": {
+        "name": "AdamW",
+        "args": {
+            "lr":1e-5, 
+            "weight_decay": 0.005
+        }
+    },
+    "lr_scheduler": {
+        "name": "CosineAnnealingLR",
+        "args": {
+            "eta_min": 1e-8
+        }
+    },
+    "criterion": {
+        "name": "CrossEntropyLoss",
+        "background_weight": 0.3,
+        "args": {}
+    },
+    "training": {
+        "epochs": 20,
+        "early_stopping_patience": 15
+    }
+  }

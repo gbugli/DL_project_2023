@@ -19,10 +19,10 @@ from config import UNetConfig
 from argparse import ArgumentParser, Namespace
 from utils.file_utils import create_output_dirs, PathsContainer
 
-from video_dataset import VideoFrameDataset, ImglistToTensor
+from dataset.video_dataset import VideoFrameDataset, ImglistToTensor
 
-from unet_model import UNet
-from early_stop import EarlyStop
+from models.UNet import UNet
+from utils.early_stop import EarlyStop
 import losses
 
 # import segmentation_models_pytorch as smp
@@ -30,7 +30,7 @@ import losses
 
 
 def parse_args() -> Namespace:
-    parser = ArgumentParser("JEPA")
+    parser = ArgumentParser("UNet")
     parser.add_argument("--config-file-name", required=True, type=str, help="Name of json file with config")
     parser.add_argument("--output-dir", help="Name of dir to save the checkpoints to", required=True, type=str)
     parser.add_argument("--run-id", help="Name of the run", required=True, type=str)
@@ -39,14 +39,14 @@ def parse_args() -> Namespace:
     return parser.parse_args()
 
 
-def load_data(root, annotation_file, batch_size=2):
+def load_data(root, annotation_file, batch_size=2, mask=False, shuffle=True):
     preprocess = transforms.Compose([
-              ImglistToTensor(),  # list of PIL images to (FRAMES x CHANNELS x HEIGHT x WIDTH) tensor
-              # transforms.Resize(299),  # image batch, resize smaller edge to 299
-              # transforms.Resize((160,240)),
-              # transforms.CenterCrop(299),  # image batch, center crop to square 299x299
-              transforms.Normalize((0.61749697, 0.6050092, 0.52180636), (2.1824553, 2.1553133, 1.9115673)),
-          ])
+            ImglistToTensor(),  # list of PIL images to (FRAMES x CHANNELS x HEIGHT x WIDTH) tensor
+            # transforms.Resize(299),  # image batch, resize smaller edge to 299
+            # transforms.Resize((160,240)),
+            # transforms.CenterCrop(299),  # image batch, center crop to square 299x299
+            transforms.Normalize((0.61749697, 0.6050092, 0.52180636), (2.1824553, 2.1553133, 1.9115673)),
+        ])
 
     dataset = VideoFrameDataset(
         root_path=root,
@@ -55,14 +55,14 @@ def load_data(root, annotation_file, batch_size=2):
         frames_per_segment=22,
         imagefile_template='image_{:d}.png',
         transform=preprocess,
-        mask=True,
+        mask=mask,
         test_mode=False
     )
 
     dataloader = torch.utils.data.DataLoader(
             dataset=dataset,
             batch_size=batch_size,
-            shuffle=True,
+            shuffle=shuffle,
             num_workers=2, # arbitrarily chosen
             pin_memory=True
         )
@@ -122,9 +122,8 @@ def train_model(epoch, model, trainloader, valloader, optimizer, criterion, sche
                 outputs = torch.argmax(outputs, dim=1)
 
                 # save predicted and real masks for jaccard index
-                # BEWARE: this only works with batch size 2
-                val_predicted.append(outputs[[21,43]].cpu())
-                val_truth.append(masks[[21,43]].cpu())
+                val_predicted.append(outputs[[(i+1)*22 -1 for i in range(frames.shape[0])]].cpu())
+                val_truth.append(masks[[(i+1)*22 -1 for i in range(frames.shape[0])]].cpu())
 
                 val_loss += loss.item()
         
@@ -271,4 +270,4 @@ if __name__ == '__main__':
   model.to(device)
 
   print('Start training model...')
-  train_model(model, dataloader_train, dataloader_val, optimizer, criterion, scheduler, early_stop, device, num_epochs, paths.save_dir)
+  train_model(epoch, model, dataloader_train, dataloader_val, optimizer, criterion, scheduler, early_stop, device, num_epochs, paths.save_dir)
