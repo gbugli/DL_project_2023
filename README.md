@@ -83,7 +83,11 @@ Usage: `python ConvLSTM_train.py --config-file-name configs/lstm_config.json --o
 We perform the finetuning on the provided training set of the ConvLSTM for the specific prediction task. We finetuned the ConvLSTM pre-trained as described above using the labeled training set, containing true mask labels for each of the 22 video frames. The finetuning process works as follows
 - For each batch, we first use the first 11 frames to predict the following one (12th), compute the loss and update the parameters with the optimizer step.
 - Then we recursively predict the following frames building on the previous ones and update the parameters at every step. This means that to predict the 22nd frame will use the previous 10 predicted and the 11th given.
-In this way the model should be fietuned for our specific prediction task.
+In this way the model should be finetuned for our specific prediction task.
+
+To finetune the ConvLSTM on the training masks, we provide the `ConvLSTM_finetune.py` script. Change the data path file in `configs/lfinetune_config.json` with your current path for the training data (`[path/to/train/set]`) and the validation data (`[path/to/validation/set]`). 
+
+Usage: `python ConvLSTM_finetune.py --config-file-name configs/finetune_config.json --output-dir [where/to/put/checkpoints] --run-id [assign-a-run-id] --resume [True/False, depending on if you are resuming a previous run]`
 
 # Generate predicted masks for hidden
 We used a jupyter notebook in order to generate the final predictions for the hidden set, which can be found at `Notebooks/Generate_predictions_for_hidden.ipynb`.
