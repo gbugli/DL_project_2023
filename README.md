@@ -1,4 +1,5 @@
-# DL_project_2023
+# Deep Learning Competition Spring 2023
+## Group 25: Ticino Tech Titans
 
 
 ### How to train the ConvLSTM to reproduce our results
