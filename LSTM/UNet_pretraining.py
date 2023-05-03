@@ -73,7 +73,7 @@ def train_model(epoch, model, trainloader, valloader, optimizer, criterion, sche
       # Training
         model.train()
         train_loss = 0
-        for frames, labels, masks in trainloader:
+        for idx, (frames, labels, masks) in enumerate(trainloader):
             frames, labels, masks = frames.to(device), labels.to(device), masks.to(device)
 
             optimizer.zero_grad()
@@ -96,6 +96,9 @@ def train_model(epoch, model, trainloader, valloader, optimizer, criterion, sche
             scheduler.step()
 
             train_loss += loss.item()
+
+            if idx % 50 == 0 and epoch < 5:
+              print(f"Loss on current batch: {loss.item()}") # we can just take a sample, don't need to average it
 
         avg_epoch_loss = train_loss / len(trainloader)
 
@@ -122,8 +125,8 @@ def train_model(epoch, model, trainloader, valloader, optimizer, criterion, sche
                 outputs = torch.argmax(outputs, dim=1)
 
                 # save predicted and real masks for jaccard index
-                val_predicted.append(outputs[[(i+1)*22 -1 for i in range(frames.shape[0])]].cpu())
-                val_truth.append(masks[[(i+1)*22 -1 for i in range(frames.shape[0])]].cpu())
+                val_predicted.append(rearrange(outputs, '(b t) h w -> b t h w', b=frames.shape[0])[:, -1].cpu())
+                val_truth.append(rearrange(masks, '(b t) h w -> b t h w', b=frames.shape[0])[:, -1].cpu())
 
                 val_loss += loss.item()
         
