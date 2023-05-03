@@ -85,7 +85,7 @@ We perform the finetuning on the provided training set of the ConvLSTM for the s
 - Then we recursively predict the following frames building on the previous ones and update the parameters at every step. This means that to predict the 22nd frame will use the previous 10 predicted and the 11th given.
 In this way the model should be finetuned for our specific prediction task.
 
-To finetune the ConvLSTM on the training masks, we provide the `ConvLSTM_finetune.py` script. Change the data path file in `configs/lfinetune_config.json` with your current path for the training data (`[path/to/train/set]`) and the validation data (`[path/to/validation/set]`). 
+To finetune the ConvLSTM on the training masks, we provide the `ConvLSTM_finetune.py` script. Change the data path file in `configs/finetune_config.json` with your current path for the training data (`[path/to/train/set]`) and the validation data (`[path/to/validation/set]`). 
 
 Usage: `python ConvLSTM_finetune.py --config-file-name configs/finetune_config.json --output-dir [where/to/put/checkpoints] --run-id [assign-a-run-id] --resume [True/False, depending on if you are resuming a previous run]`
 
