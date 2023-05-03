@@ -90,6 +90,6 @@ To finetune the ConvLSTM on the training masks, we provide the `ConvLSTM_finetun
 Usage: `python ConvLSTM_finetune.py --config-file-name configs/finetune_config.json --output-dir [where/to/put/checkpoints] --run-id [assign-a-run-id] --resume [True/False, depending on if you are resuming a previous run]`
 
 # Generate predicted masks for hidden
-We used a jupyter notebook in order to generate the final predictions for the hidden set, which can be found at `Notebooks/Generate_predictions_for_hidden.ipynb`.
+We used a jupyter notebook in order to generate the final predictions for the hidden set, which can be found at `Generate_predictions_for_hidden.ipynb`.
 To use the notebook, make sure to have the UNet and ConvLSTM trained models as well as the python scripts with the classes used (models, dataset, utils). 
 
