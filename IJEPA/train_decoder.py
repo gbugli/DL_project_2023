@@ -11,14 +11,14 @@ from torchvision import datasets, transforms
 import math
 import torch.nn.functional as F
 import warnings
-from video_dataset import VideoFrameDataset, ImglistToTensor
+from IJEPA.video_dataset import VideoFrameDataset, ImglistToTensor
 from argparse import ArgumentParser, Namespace
 
-from decoders import Decoder, ATMHead
-from models import IJEPA_base, EarlyStop
-from atm_loss import ATMLoss
+from IJEPA.decoders import Decoder, ATMHead
+from IJEPA.models import IJEPA_base, EarlyStop
+from IJEPA.atm_loss import ATMLoss
 
-from eval import compute_jaccard
+from IJEPA.eval import compute_jaccard
 
 def parse_args() -> Namespace:
     parser = ArgumentParser("Decoder")

@@ -1,0 +1,46 @@
+    {
+    "lstm_model": {
+        "path": "",
+        "args": {
+            "num_channels": 49,
+            "num_kernels": 64,
+            "kernel_size": [3,3],
+            "padding": [1,1],
+            "activation": "relu",
+            "frame_size": [160,240],
+            "num_layers": 2
+        }
+    },
+    "data": {
+        "train": {
+            "path": "/scratch/ln2205/output_masks",
+            "batch_size": 8
+        }, 
+        "val": {
+            "path": "/val",
+            "batch_size": 8
+        }
+    },
+    "optimizer": {
+        "name": "AdamW",
+        "args": {
+                "lr":1e-5, 
+                "weight_decay": 0.005
+        }
+    },
+    "lr_scheduler": {
+        "name": "CosineAnnealingLR",
+        "args": {
+                "eta_min": 1e-8
+        }
+    },
+    "criterion": {
+        "name": "CrossEntropyLoss",
+        "background_weight": 0.3,
+        "args": {}
+    },
+    "training": {
+        "epochs": 20,
+        "early_stopping_patience": 15
+    }
+}

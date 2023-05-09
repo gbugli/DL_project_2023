@@ -1,0 +1,35 @@
+{
+    "unet_model": {
+        "path": < str[optional], path to the best saved UNet model>,
+        "args": {
+            "n_class": <int, number of classes>
+        }
+    },
+    "data": {
+        "train": {
+            "path": <str, path to dataset dir>,
+            "batch_size": <int, batch size>
+        }, 
+        "val": {
+            "path": <str, path to dataset dir>>,
+            "batch_size": <int, batch size>
+        }
+    },
+    "optimizer": {
+        "name": <str, name of the optimizer as in torch.optim>,
+        "args": <dict, arguments of the optimizer>
+    },
+    "lr_scheduler": {
+        "name": <str, name of the LR scheduler as in torch.optim.lr_scheduler>,
+        "args": <dict, arguments of the LR scheduler>
+    },
+    "criterion": {
+        "name": <str, name of the LR scheduler as in torch.optim.lr_scheduler or our custom losses>,
+        "background_weight": <float, weight of the background class>
+        "args": <dict[optional], arguments of the criterion>
+    },
+    "training": {
+        "epochs": <int, number of epochs>,
+        "early_stopping_patience": <int, number of epochs for early stopping>
+    }
+  }

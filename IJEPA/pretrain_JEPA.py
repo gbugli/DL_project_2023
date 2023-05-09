@@ -13,10 +13,10 @@ from torchvision import datasets, transforms
 import math
 import torch.nn.functional as F
 import warnings
-from video_dataset import VideoFrameDataset, ImglistToTensor
+from IJEPA.video_dataset import VideoFrameDataset, ImglistToTensor
 from argparse import ArgumentParser, Namespace
 
-from models import IJEPA_base, CustomDataParallel, EarlyStop
+from IJEPA.models import IJEPA_base, CustomDataParallel, EarlyStop
 
 def parse_args() -> Namespace:
     parser = ArgumentParser("JEPA")
@@ -85,7 +85,12 @@ def compute_rank(prediction_blocks, threshold=0.85):
 def compute_rank_per_frame(prediction_blocks, threshold=0.85):
   frame_ranks = torch.zeros(prediction_blocks.size(1), dtype=torch.int64)
   for i in range(prediction_blocks.size(1)):
+<<<<<<< HEAD:pretrain_JEPA.py
     frame_ranks[i] = compute_rank(prediction_blocks[:, i, :, :], threshold)
+=======
+    frame_ranks[i] = compute_rank(prediction_blocks[:, i, :], threshold)
+  
+>>>>>>> LSTM:IJEPA/pretrain_JEPA.py
   return frame_ranks
 
 # Train the model
@@ -113,9 +118,13 @@ def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_d
             utils.clip_grad_norm_(model.parameters(), 1.0)
 
             optimizer.step()
-
-            student_model = model.module.student_encoder.eval()
-            teacher_model = model.module.teacher_encoder.eval()
+            
+            if torch.cuda.device_count() > 1:
+                student_model = model.module.student_encoder.eval()
+                teacher_model = model.module.teacher_encoder.eval()
+            else:
+                student_model = model.student_encoder.eval()
+                teacher_model = model.teacher_encoder.eval()
             with torch.no_grad():
                 for student_param, teacher_param in zip(student_model.parameters(), teacher_model.parameters()):
                     teacher_param.data.mul_(m).add_(1 - m, student_param.data)
@@ -126,7 +135,11 @@ def train_model(epoch, model, criterion, optimizer, scheduler, dataloader, val_d
               target_cos_sim, sense_check = mean_cosine_similarity(target_blocks)
               pred_cos_sim, sense_check = mean_cosine_similarity(prediction_blocks)
               print(f"Current loss: {loss.item()}")
+<<<<<<< HEAD:pretrain_JEPA.py
               print(f"Overall pred rank: {compute_rank(prediction_blocks)}, Context rank per frame: {compute_rank_per_frame(rearrange(context_embeddings, 'b (t n) m -> b t n m', t=22))}")
+=======
+              # print(f"Overall pred rank: {compute_rank(prediction_blocks)}, Context rank per frame: {compute_rank_per_frame(context_embeddings)}")
+>>>>>>> LSTM:IJEPA/pretrain_JEPA.py
               print(f"Context cos_sim: {context_cos_sim}, Target cos_sim: {target_cos_sim}, Pred cos_sim: {pred_cos_sim}, Sense check: {sense_check}")
 
             # Update the learning rate using the scheduler
@@ -232,7 +245,7 @@ if __name__ == "__main__":
     epoch = 0
 
     # get these params from a global config?
-    model = IJEPA_base(img_size=128, patch_size=16, in_chans=3, norm_layer=nn.LayerNorm, num_frames=22, attention_type='joint_space_time', dropout=0.1, mode="train", r=0.5, embed_dim=768, device=device,
+    model = IJEPA_base(img_size=128, patch_size=16, in_chans=3, norm_layer=nn.LayerNorm, num_frames=22, attention_type='joint_space_time', dropout=0.01, mode="train", r=0.5, embed_dim=528, device=device,
                         # encoder parameters
                         enc_depth=4,
                         enc_num_heads=6,
